@@ -1,0 +1,311 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Monitoring AI agents</title>
+<style>
+html,body{margin:0;background:#0f1a2e;color:#eef2fa;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+#stage{width:1280px;height:720px;display:block}
+#ctl{position:fixed;left:12px;bottom:10px;z-index:5}
+#ctl button{font-size:16px;padding:6px 14px;background:#2fb8b4;color:#0f1a2e;font-weight:700;border:0;border-radius:6px;cursor:pointer}
+.rec #ctl{display:none}
+text{font-family:Arial,Helvetica,sans-serif}
+</style></head>
+<body>
+<svg id="stage" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="ctl"><button id="play">▶ Play</button></div>
+<audio id="aud" src="narration.mp3" preload="auto"></audio>
+<script src="words.js"></script>
+<script>
+const W = WORDS.words, S = document.getElementById('stage');
+if (location.hash === '#rec') document.body.classList.add('rec');
+const C = {bg:'#0f1a2e', ink:'#eef2fa', dim:'#9aa8c0', or:'#2fb8b4', bl:'#7fa8e6', gr:'#3fb27f', red:'#e46a6a', warn:'#e0a940',
+           box:'#18263f', line:'#33456a', navy:'#1c2b4a', paper:'#ffffff', soft:'#f5f7fb', ptext:'#172033', pmuted:'#536071', pborder:'#d9dee8', ok:'#1f7a4d', bad:'#a23333'};
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g,'');
+function at(phrase, after=0){
+  const p = phrase.split(/\s+/).map(norm);
+  for (let i=0;i<W.length;i++){
+    if (W[i].start < after) continue;
+    let ok = true;
+    for (let j=0;j<p.length;j++){ if (!W[i+j] || norm(W[i+j].text)!==p[j]) {ok=false;break;} }
+    if (ok) return W[i].start;
+  }
+  console.error('phrase not found: '+phrase); return 1e9;
+}
+const END = W[W.length-1].end + 1.5;
+const T = {
+  intro: 0,
+  drift: at('Start with why'),
+  qs: at('So monitoring comes down'),
+  where: at('The first question is'),
+  access: at('The second question is'),
+  doing: at('The third question is'),
+  combine: at('Now bring the three'),
+  review: at('A report on its own'),
+  outro: at('So scanner metadata shows'),
+};
+const cue = {
+  intended: at('Policy data tiers'), checks: at('Monitoring checks that'), fabric: at('This video shows'),
+  many: at('access is granted in'), admins: at('There are tenant admins'), add: at('and each of them'), drift: at('Over time permissions'),
+  sp: at('A service principal is'), grp: at('A group that an'), day: at('Each change made'), far: at('Together an identity'),
+  q1: at('Where are agents operating'), q2: at('What can they access'), q3: at('And what are they'), ev: at('Each question has'),
+  inv: at('The metadata scanning admin'), items: at('That covers workspaces'), first: at('The first run scans'), changed: at('After that you only'), map: at('The result is a map'),
+  list: at('For each workspace and'), reverse: at('You can also ask'), given: at('Given one identity'), agent: at('That is the view'), compare: at('You compare it'), example: at('For example an agent'),
+  log: at('The activity log records'), types: at('That includes viewing'), practical: at('One practical point'), weeks: at('The activity log only'), gone: at('Otherwise the evidence'),
+  familiar: at('This is familiar work'), land: at('Land each feed'), model: at('Model it as'), report: at('Then build a report'), useful: at('Useful checks include'),
+  c1: at('identities with admin roles'), c2: at('access that has not'), c3: at('agents touching items'), c4: at('and activity outside'),
+  nothing: at('A report on its own'), own: at('Someone needs to own'), decide: at('They decide what'), over: at('Over privileging is'), recd: at('Record each decision'),
+  s1: at('So scanner metadata shows'), s2: at('Identity and permissions show'), s3: at('Activity events show'), s4: at('Bring them together review'), goal: at('The goal is simple'), keep: at('Keep checking that'),
+};
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>{x=clamp(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2};
+const fin=(t,t0,d=.5)=>ease((t-t0)/d);
+let out='';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function txt(x,y,s,{size=28,fill=C.ink,anchor='start',weight=400,op=1,italic=false,mono=false}={}){ if(op<=0)return; out+=`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}" opacity="${op}"${italic?' font-style="italic"':''}${mono?' font-family="Consolas,monospace"':''}>${esc(s)}</text>`; }
+function rect(x,y,w,h,{fill=C.box,stroke=C.line,sw=2,r=10,op=1,dash=''}={}){ if(op<=0)return; out+=`<rect x="${x}" y="${y}" width="${Math.max(0,w)}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function circ(x,y,r,{fill=C.box,stroke=C.line,sw=2,op=1}={}){ if(op<=0)return; out+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"/>`; }
+function line(x1,y1,x2,y2,{stroke=C.dim,sw=2,op=1,dash=''}={}){ if(op<=0)return; out+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function path(d,{stroke=C.dim,sw=2,op=1,dash='',fill='none'}={}){ if(op<=0)return; out+=`<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function arrow(x1,y1,x2,y2,o={}){ line(x1,y1,x2,y2,o); const a=Math.atan2(y2-y1,x2-x1),L=12; const op=o.op??1; if(op<=0)return;
+  out+=`<polygon points="${x2},${y2} ${x2-L*Math.cos(a-.4)},${y2-L*Math.sin(a-.4)} ${x2-L*Math.cos(a+.4)},${y2-L*Math.sin(a+.4)}" fill="${o.stroke||C.dim}" opacity="${op}"/>`; }
+function tick(x,y,s,col,op,sw=3){ path(`M${x-s*.5},${y} L${x-s*.12},${y+s*.38} L${x+s*.55},${y-s*.4}`,{stroke:col,sw,op}); }
+function cross(x,y,s,col,op){ line(x-s/2,y-s/2,x+s/2,y+s/2,{stroke:col,sw:3,op}); line(x+s/2,y-s/2,x-s/2,y+s/2,{stroke:col,sw:3,op}); }
+function title(t,t0,s,sub){ const o=fin(t,t0); txt(64,78,s,{size:36,weight:700,op:o}); if(sub) txt(64,112,sub,{size:20,fill:C.dim,op:o}); }
+function pill(x,y,w,label,col,op,size=20,h=44,fillA='22',tcol=C.ink,weight=400){ rect(x,y,w,h,{fill:col+fillA,stroke:col,op,r:h/2}); txt(x+w/2,y+h/2+size*.36,label,{size,anchor:'middle',op,fill:tcol,weight}); }
+function wrap(s,n){ const ls=[]; let l=''; for(const w of s.split(' ')){ if((l+' '+w).length>n&&l){ls.push(l);l=w;} else l=l?l+' '+w:w; } ls.push(l); return ls; }
+function tag(x,y,s,col,op){ const w=s.length*7.4+18; rect(x,y,w,22,{fill:col+'2a',stroke:col,sw:1.2,op,r:11}); txt(x+w/2,y+15.5,s,{size:12,anchor:'middle',op,weight:700,fill:col}); return w; }
+
+// --- icons ---
+function icon(kind,x,y,s,col,op){ if(op<=0) return; const k=s/60;
+  if(kind==='pin'){ path(`M${x},${y+26*k} C${x-6*k},${y+10*k} ${x-20*k},${y} ${x-20*k},${y-10*k} A${20*k},${20*k} 0 0 1 ${x+20*k},${y-10*k} C${x+20*k},${y} ${x+6*k},${y+10*k} ${x},${y+26*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); circ(x,y-10*k,7*k,{fill:col,stroke:'none',sw:0,op}); }
+  if(kind==='key'){ circ(x-12*k,y-8*k,13*k,{fill:col+'22',stroke:col,sw:3,op}); circ(x-12*k,y-8*k,4*k,{fill:col,stroke:'none',sw:0,op}); path(`M${x-2*k},${y+2*k} L${x+22*k},${y+26*k} M${x+12*k},${y+16*k} L${x+18*k},${y+10*k} M${x+18*k},${y+22*k} L${x+24*k},${y+16*k}`,{stroke:col,sw:3.5,op}); }
+  if(kind==='laptop'){ rect(x-25*k,y-22*k,50*k,34*k,{fill:col+'22',stroke:col,sw:3,op,r:4}); path(`M${x-32*k},${y+20*k} L${x+32*k},${y+20*k}`,{stroke:col,sw:4,op}); [-10,0,-1].forEach((d,i)=>{ if(i<2) line(x-14*k,y+(i*11-11)*k,x+14*k,y+(i*11-11)*k,{stroke:col,sw:2.5,op}); }); }
+  if(kind==='person'){ circ(x,y-14*k,11*k,{fill:col+'33',stroke:col,op}); path(`M${x-20*k},${y+24*k} Q${x},${y-8*k} ${x+20*k},${y+24*k} Z`,{stroke:col,fill:col+'33',op}); }
+  if(kind==='bot'){ rect(x-20*k,y-14*k,40*k,32*k,{fill:col+'22',stroke:col,sw:3,op,r:8*k}); circ(x-8*k,y,4*k,{fill:col,stroke:'none',sw:0,op}); circ(x+8*k,y,4*k,{fill:col,stroke:'none',sw:0,op}); line(x,y-14*k,x,y-24*k,{stroke:col,sw:3,op}); circ(x,y-26*k,4*k,{fill:col,stroke:'none',sw:0,op}); line(x-7*k,y+10*k,x+7*k,y+10*k,{stroke:col,sw:2.5,op}); }
+  if(kind==='db'){ out+=`<ellipse cx="${x}" cy="${y-18*k}" rx="${22*k}" ry="${8*k}" fill="${col}22" stroke="${col}" stroke-width="3" opacity="${op}"/>`; path(`M${x-22*k},${y-18*k} L${x-22*k},${y+18*k} A${22*k},${8*k} 0 0 0 ${x+22*k},${y+18*k} L${x+22*k},${y-18*k}`,{stroke:col,sw:3,op,fill:col+'22'}); path(`M${x-22*k},${y} A${22*k},${8*k} 0 0 0 ${x+22*k},${y}`,{stroke:col,sw:2.5,op}); }
+  if(kind==='group'){ icon('person',x-12*k,y+2*k,s*.7,col,op); icon('person',x+12*k,y+2*k,s*.7,col,op); }
+  if(kind==='review'){ rect(x-28*k,y-22*k,56*k,38*k,{fill:col+'22',stroke:col,sw:3,op,r:4}); line(x,y+16*k,x,y+24*k,{stroke:col,sw:3,op}); line(x-12*k,y+25*k,x+12*k,y+25*k,{stroke:col,sw:3,op}); circ(x-12*k,y-8*k,6*k,{fill:col,stroke:'none',sw:0,op}); path(`M${x-21*k},${y+10*k} Q${x-12*k},${y-4*k} ${x-3*k},${y+10*k} Z`,{stroke:col,fill:col,op,sw:1}); [-10,-2,6].forEach(d=>line(x+4*k,y+d*k,x+20*k,y+d*k,{stroke:col,sw:2.5,op})); }
+  if(kind==='doc'){ path(`M${x-20*k},${y-27*k} L${x+10*k},${y-27*k} L${x+21*k},${y-16*k} L${x+21*k},${y+27*k} L${x-20*k},${y+27*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); [-10,0,10].forEach(d=>line(x-11*k,y+d*k,x+12*k,y+d*k,{stroke:col,op,sw:2.5})); }
+  if(kind==='shield'){ path(`M${x},${y-26*k} L${x+22*k},${y-18*k} L${x+22*k},${y} C${x+22*k},${y+14*k} ${x+10*k},${y+22*k} ${x},${y+27*k} C${x-10*k},${y+22*k} ${x-22*k},${y+14*k} ${x-22*k},${y} L${x-22*k},${y-18*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); }
+  if(kind==='layers'){ [12,0,-12].forEach((d,i)=>path(`M${x-24*k},${y+d*k} L${x},${y+(d-10)*k} L${x+24*k},${y+d*k} L${x},${y+(d+10)*k} Z`,{stroke:col,sw:2.5,op,fill:i==2?col+'44':col+'18'})); }
+}
+const QS=[['Where are agents operating?','pin','Scanner metadata',C.or],['What can they access?','key','Identity and permissions',C.bl],['What are they doing?','laptop','Activity events',C.warn]];
+function qbar(cur,op){ QS.forEach(([q,ic,src,col],i)=>{ const x=575+i*228, act=i===cur; rect(x,28,218,40,{fill:act?col+'30':C.box,stroke:act?col:C.line,op,r:20,sw:act?2.5:1.5}); icon(ic,x+24,48,22,act?col:C.dim,op); txt(x+44,54,src,{size:14,op,fill:act?C.ink:C.dim,weight:act?700:400}); }); }
+
+const scenes = [
+ ['intro', t=>{
+   const o=fin(t,.1,.8);
+   txt(640,170,'AI AGENT GOVERNANCE',{size:20,anchor:'middle',fill:C.or,weight:700,op:o});
+   txt(640,245,'Monitoring AI agents',{size:54,anchor:'middle',weight:700,op:fin(t,.5,.8)});
+   txt(640,292,'checking that what agents do still matches what we agreed',{size:25,anchor:'middle',fill:C.dim,op:fin(t,1.0,.8)});
+   const steps=[['Policy','doc'],['Data tiers','layers'],['Identities','key'],['Monitoring','review']];
+   steps.forEach(([s,ic],i)=>{ const oo=fin(t,cue.intended+i*.5); const x=280+i*240; const mon=i==3; const lit=mon&&t>=cue.checks;
+     circ(x,420,52,{fill:lit?C.or+'2a':C.box,stroke:lit?C.or:mon?C.line:C.bl,op:oo*(mon?fin(t,cue.checks):1),sw:lit?4:2});
+     icon(ic,x,422,56,lit?C.or:C.bl,oo*(mon?fin(t,cue.checks):1));
+     txt(x,505,s,{size:21,anchor:'middle',weight:mon?700:400,op:oo*(mon?fin(t,cue.checks):1),fill:lit?C.or:C.ink});
+     if(i<3) arrow(x+60,420,x+178,420,{stroke:C.line,op:i<2?oo:fin(t,cue.checks),sw:3}); });
+   const ob=fin(t,cue.intended+.3); txt(520,560,'what we intended',{size:17,anchor:'middle',fill:C.dim,op:ob*(1-fin(t,cue.fabric))}); line(280,535,760,535,{stroke:C.dim,sw:1.5,op:ob*(1-fin(t,cue.fabric)),dash:'4 5'});
+   const of=fin(t,cue.fabric); txt(640,565,'Examples use Microsoft Fabric admin APIs',{size:19,anchor:'middle',fill:C.dim,op:of});
+ }],
+ ['drift', t=>{
+   title(t,T.drift,'Why permissions drift');
+   const oa=fin(t,cue.admins);
+   const lv=[['Tenant admins',150],['Capacity admins',290],['Workspace admins',430]];
+   lv.forEach(([s,y],i)=>{ const oo=fin(t,cue.admins+i*.7); rect(70,y,300,96,{fill:C.box,stroke:C.bl,op:oo});
+     icon('person',112,y+52,46,C.bl,oo); icon('person',146,y+52,46,C.bl,oo); txt(176,y+56,s,{size:19,weight:700,op:oo});
+     const oadd=fin(t,cue.add+i*.3); arrow(375,y+48,455,y+48,{stroke:C.dim,op:oadd,sw:2.5}); });
+   txt(415,135,'can add',{size:16,anchor:'middle',fill:C.dim,op:fin(t,cue.add)});
+   // identity card
+   const oi=fin(t,cue.add+.5);
+   rect(470,150,330,376,{fill:C.box,stroke:C.line,op:oi,r:14});
+   icon('bot',520,200,52,C.or,oi); txt(560,198,'Agent identity',{size:20,weight:700,op:oi}); txt(560,222,'service principal',{size:15,fill:C.dim,op:oi});
+   const grants=[['Read: Sales model','intended',C.gr,cue.add+.8],['Admin: Sales workspace','fix a failing refresh',C.warn,cue.sp],['Group → Finance workspace','group given new access',C.warn,cue.grp]];
+   grants.forEach(([a,b,col,c],i)=>{ const oo=fin(t,c); const y=258+i*80; rect(490,y,290,66,{fill:col+'18',stroke:col,op:oo,r:10});
+     txt(505,y+28,a,{size:17,weight:700,op:oo}); txt(505,y+52,b,{size:15,fill:C.dim,op:oo}); });
+   // access gauge
+   const od=fin(t,cue.drift);
+   txt(870,180,'ACCESS OVER TIME',{size:16,fill:C.or,weight:700,op:od});
+   line(870,500,1210,500,{stroke:C.line,sw:2,op:od}); line(870,500,870,200,{stroke:C.line,sw:2,op:od});
+   const ih=60; line(870,500-ih,1210,500-ih,{stroke:C.gr,sw:2,op:od,dash:'6 5'}); txt(1210,500-ih-8,'intended',{size:14,anchor:'end',fill:C.gr,op:od});
+   const lv2=[[cue.drift,ih],[cue.sp,170],[cue.grp,270]]; let h=0;
+   const xs=[880,990,1100];
+   lv2.forEach(([c,v],i)=>{ const oo=fin(t,c); const hh=v*oo; rect(xs[i],500-hh,90,hh,{fill:(i?C.warn:C.gr)+'55',stroke:i?C.warn:C.gr,op:oo,r:4,sw:1.5}); });
+   const of=fin(t,cue.far); rect(870,540,340,52,{fill:C.red+'1c',stroke:C.red,op:of,r:10}); txt(1040,573,'far more than anyone intended',{size:18,anchor:'middle',weight:700,op:of});
+   const odd=fin(t,cue.day); txt(635,560,'each change made sense on the day',{size:16,anchor:'middle',fill:C.dim,italic:true,op:odd});
+   txt(1040,618,'illustrative',{size:13,anchor:'middle',fill:C.dim,italic:true,op:od*(1-of*0)});
+ }],
+ ['qs', t=>{
+   title(t,T.qs,'Three questions');
+   QS.forEach(([q,ic,src,col],i)=>{ const c=[cue.q1,cue.q2,cue.q3][i]; const o=fin(t,c); const x=225+i*415;
+     rect(x-185,150,370,280,{fill:C.box,stroke:col,op:o,r:16,sw:2});
+     circ(x,250,64,{fill:col+'1c',stroke:col,op:o,sw:2.5}); icon(ic,x,252,74,col,o);
+     txt(x,375,q,{size:23,anchor:'middle',weight:700,op:o});
+     const oe=fin(t,cue.ev+i*.6); line(x,430,x,470,{stroke:col,sw:2.5,op:oe}); pill(x-150,472,300,src,col,oe,20,48,'26',C.ink,700); });
+   const ok=fin(t,cue.ev+2); txt(640,580,'each question has its own source of evidence',{size:19,anchor:'middle',fill:C.dim,op:ok});
+ }],
+ ['where', t=>{
+   qbar(0,fin(t,T.where)); title(t,T.where,'Where are agents operating?','Scanner metadata');
+   const o=fin(t,cue.inv);
+   // tenant inventory
+   rect(64,150,620,400,{fill:C.box,stroke:C.line,op:o,r:14}); txt(88,184,'TENANT INVENTORY',{size:16,fill:C.or,weight:700,op:o});
+   const ws=[['Sales',[['Sales model','layers',''],['Sales data agent','bot','']],'General'],['Finance',[['Finance lakehouse','db',''],['Forecast agent','bot','']],'Confidential'],['People',[['HR model','layers','']],'Highly confidential']];
+   ws.forEach(([n,its,lab],i)=>{ const oo=fin(t,cue.items+i*.6); const y=200+i*114; rect(84,y,580,100,{fill:C.bg,stroke:C.line,op:oo,r:10});
+     txt(102,y+28,n+' workspace',{size:18,weight:700,op:oo});
+     const lc=lab==='General'?C.gr:lab==='Confidential'?C.warn:C.red; tag(440,y+12,lab,lc,oo*fin(t,cue.items+3));
+     its.forEach(([s,ic],k)=>{ const ox=oo*fin(t,cue.items+1+k*.4+i*.3); const x=102+k*270; const isAg=ic==='bot'; const hl=isAg&&t>=cue.map;
+       rect(x,y+42,250,46,{fill:hl?C.or+'26':C.box,stroke:hl?C.or:C.line,op:ox,r:8,sw:hl?2.5:1.5}); icon(ic,x+26,y+66,30,isAg?C.or:C.bl,ox); txt(x+50,y+71,s,{size:16,op:ox}); }); });
+   const os=fin(t,cue.items+3); txt(374,575,'items · data sources · sensitivity labels',{size:15,anchor:'middle',fill:C.dim,op:os*(1-fin(t,cue.map))});
+   const om=fin(t,cue.map); txt(374,575,'a map of where agent items live, and what data sits next to them',{size:15,anchor:'middle',fill:C.or,op:om});
+   // scanning: batches + incremental
+   const of=fin(t,cue.first);
+   txt(720,184,'HOW THE SCAN RUNS',{size:16,fill:C.or,weight:700,op:of});
+   rect(720,200,500,170,{fill:C.box,stroke:C.line,op:of,r:12});
+   txt(740,232,'First run: everything, in batches of up to 100',{size:16,op:of});
+   const scanned=clamp((t-cue.first-1)/5);
+   for(let b=0;b<3;b++){ for(let j=0;j<40;j++){ const cx=742+(j%20)*22, cy=250+b*0+Math.floor(j/20)*0; }
+   }
+   for(let j=0;j<60;j++){ const cx=746+(j%20)*22.5, cy=258+Math.floor(j/20)*24; const batch=Math.floor(j/20); const lit=scanned*3>batch+((j%20)/20);
+     rect(cx-8,cy,17,17,{fill:lit?C.or+'88':C.bg,stroke:lit?C.or:C.line,op:of,r:3,sw:1}); }
+   txt(740,350,'each square = 5 workspaces · 3 batches shown',{size:13,fill:C.dim,op:of,italic:true});
+   const oc=fin(t,cue.changed);
+   rect(720,390,500,170,{fill:C.box,stroke:C.line,op:oc,r:12});
+   txt(740,422,'After that: only workspaces that changed',{size:16,op:oc});
+   const chg=[3,11,27,44,52];
+   for(let j=0;j<60;j++){ const cx=746+(j%20)*22.5, cy=438+Math.floor(j/20)*24; const c=chg.includes(j);
+     rect(cx-8,cy,17,17,{fill:c?C.warn+'aa':C.bg,stroke:c?C.warn:C.line,op:oc,r:3,sw:1}); }
+   txt(740,540,'modified since the last scan',{size:13,fill:C.dim,op:oc,italic:true});
+ }],
+ ['access', t=>{
+   qbar(1,1); title(t,T.access,'What can they access?','Identity and permissions');
+   // phase A: item view
+   const oA=fin(t,cue.list)*(1-fin(t,cue.reverse,.5));
+   rect(64,150,760,410,{fill:C.paper,stroke:C.pborder,op:oA,r:12,sw:1});
+   icon('layers',104,196,44,C.navy,oA); txt(140,192,'Sales model',{size:22,weight:700,fill:C.navy,op:oA}); txt(140,216,'who has access to this item?',{size:15,fill:C.pmuted,op:oA});
+   const hd=['Principal','Type','Role or permission']; const cx=[100,400,570];
+   hd.forEach((h,i)=>txt(cx[i],262,h,{size:15,weight:700,fill:C.pmuted,op:oA}));
+   const rows=[['person','A. Analyst','User','Read'],['group','Sales analysts','Group','Read, Build'],['bot','sales-agent-sp','Service principal','Read'],['group','BI admins','Group','Workspace admin']];
+   rows.forEach(([ic,a,b,c],i)=>{ const oo=oA*fin(t,cue.list+1+i*.6); const y=280+i*62; line(84,y,804,y,{stroke:C.pborder,sw:1,op:oA});
+     icon(ic,112,y+33,30,ic==='bot'?C.or:C.navy,oo); txt(140,y+38,a,{size:18,fill:C.ptext,op:oo,weight:ic==='bot'?700:400}); txt(cx[1],y+38,b,{size:17,fill:C.pmuted,op:oo}); txt(cx[2],y+38,c,{size:17,fill:C.ptext,op:oo}); });
+   const nA=oA; txt(444,545,'illustrative',{size:13,anchor:'middle',fill:C.pmuted,italic:true,op:nA});
+   rect(860,150,360,190,{fill:C.box,stroke:C.bl,op:oA*fin(t,cue.list+.5)}); txt(880,185,'For every workspace and item:',{size:17,weight:700,op:oA*fin(t,cue.list+.5)});
+   ['users, groups and service principals','the role or permission each holds'].forEach((s,i)=>{ const oo=oA*fin(t,cue.list+1+i*.8); tick(892,222+i*44,16,C.gr,oo); txt(912,229+i*44,s,{size:17,op:oo}); });
+   // phase B: identity view (reverse)
+   const oB=fin(t,cue.reverse);
+   txt(64,175,'THE REVERSE QUESTION',{size:16,fill:C.or,weight:700,op:oB});
+   rect(64,195,300,150,{fill:C.box,stroke:C.or,op:fin(t,cue.given),r:14,sw:2.5}); icon('bot',114,262,62,C.or,fin(t,cue.given)); txt(160,255,'sales-agent-sp',{size:19,weight:700,op:fin(t,cue.given)}); txt(160,282,'given one identity,',{size:15,fill:C.dim,op:fin(t,cue.given)}); txt(160,302,'what can it reach?',{size:15,fill:C.dim,op:fin(t,cue.given)});
+   const oc=fin(t,cue.compare);
+   // agreed
+   txt(420,175,'AGREED',{size:16,fill:C.gr,weight:700,op:oc});
+   rect(420,195,300,150,{fill:C.gr+'14',stroke:C.gr,op:oc,r:14}); icon('layers',460,265,40,C.gr,oc); txt(490,258,'Read',{size:18,weight:700,op:oc}); txt(490,282,'1 sales semantic model',{size:16,op:oc});
+   // actual
+   const oe=fin(t,cue.example+1);
+   txt(780,175,'ACTUAL',{size:16,fill:C.red,weight:700,op:oe});
+   rect(780,195,440,300,{fill:C.red+'10',stroke:C.red,op:oe,r:14});
+   txt(800,228,'Contributor across 12 workspaces',{size:18,weight:700,op:oe});
+   for(let j=0;j<12;j++){ const oo=fin(t,cue.example+1.5+j*.18); const x=800+(j%4)*102, y=248+Math.floor(j/4)*76; rect(x,y,92,64,{fill:C.box,stroke:C.red,op:oo,r:8,sw:1.5}); txt(x+46,y+38,'WS '+(j+1),{size:15,anchor:'middle',op:oo}); }
+   const ox=fin(t,cue.example+4); txt(750,285,'≠',{size:44,anchor:'middle',weight:700,fill:C.red,op:ox});
+   txt(640,560,'compare what an identity can reach with what was agreed',{size:19,anchor:'middle',fill:C.dim,op:oc*(1-oe)});
+   txt(1000,520,'illustrative',{size:13,anchor:'middle',fill:C.dim,italic:true,op:oe});
+ }],
+ ['doing', t=>{
+   qbar(2,1); title(t,T.doing,'What are they doing?','Activity events');
+   const o=fin(t,cue.log);
+   const X=64,Wd=760; rect(X,150,Wd,330,{fill:C.paper,stroke:C.pborder,op:o,r:12,sw:1});
+   txt(X+20,180,'ACTIVITY LOG',{size:15,fill:C.navy,weight:700,op:o}); txt(X+Wd-20,180,'illustrative',{size:13,fill:C.pmuted,italic:true,anchor:'end',op:o});
+   const cx=[X+20,X+130,X+330,X+530]; ['When','Who','What','Which item'].forEach((h,i)=>txt(cx[i],212,h,{size:14,weight:700,fill:C.pmuted,op:o}));
+   const ev=[['09:02','A. Analyst','Viewed report','Sales overview'],['09:14','sales-agent-sp','Queried model','Sales model'],['10:31','sales-agent-sp','Exported data','Sales model'],['11:05','J. Lead','Shared item','Forecast agent'],['11:40','BI admin','Changed permissions','Finance workspace'],['12:18','sales-agent-sp','Queried model','HR model']];
+   ev.forEach((r,i)=>{ const c=i==0?cue.log+.5:cue.types+(i-1)*1.1; const oo=fin(t,c); const y=224+i*40; const ag=r[1].includes('agent'); const bad=i==5;
+     if(bad) rect(X+8,y+2,Wd-16,36,{fill:'#fdecec',stroke:C.bad,op:oo*fin(t,cue.types+6),r:6,sw:1.5});
+     line(X+12,y,X+Wd-12,y,{stroke:C.pborder,sw:1,op:o});
+     r.forEach((s,k)=>txt(cx[k],y+27,s,{size:16,fill:k==2?C.navy:C.ptext,weight:(k==1&&ag)||k==2?700:400,op:oo,mono:k==0})); });
+   // retention
+   const op=fin(t,cue.practical);
+   txt(860,180,'ONE PRACTICAL POINT',{size:16,fill:C.or,weight:700,op:op});
+   rect(860,195,360,285,{fill:C.box,stroke:C.line,op:op,r:14});
+   const ow=fin(t,cue.weeks);
+   txt(880,228,'About 4 weeks of history via the API',{size:16,weight:700,op:ow});
+   const sh=clamp((t-cue.weeks-1)/4)*8;
+   for(let d=0;d<40;d++){ const x=880+(d%10)*32, y=245+Math.floor(d/10)*26; const age=39-d; const inWin=age<28; const lost=!inWin;
+     rect(x,y,26,20,{fill:inWin?C.warn+'66':C.bg,stroke:inWin?C.warn:C.line,op:ow*(lost?.45:1),r:3,sw:1}); if(lost&&ow>0) cross(x+13,y+10,9,C.red,ow*.7); }
+   txt(880,368,'older days fall out of reach',{size:14,fill:C.dim,italic:true,op:ow});
+   const og=fin(t,cue.weeks+3.2);
+   arrow(1040,388,1040,418,{stroke:C.or,op:og,sw:3});
+   rect(880,422,320,46,{fill:C.or+'22',stroke:C.or,op:og,r:23}); icon('db',906,445,24,C.or,og); txt(1050,451,'pull daily, keep your own copy',{size:16,anchor:'middle',weight:700,op:og});
+   
+ }],
+ ['combine', t=>{
+   title(t,T.combine,'Bring the three together');
+   const o=fin(t,T.combine+.4);
+   QS.forEach(([q,ic,src,col],i)=>{ const oo=fin(t,cue.land+i*.4); const y=160+i*100; pill(64,y,250,src,col,oo,17,48,'26',C.ink,700); arrow(318,y+24,380,y+24,{stroke:col,op:fin(t,cue.land+1),sw:2.5}); });
+   const ol=fin(t,cue.land+1); rect(385,150,140,270,{fill:C.box,stroke:C.or,op:ol,r:14}); icon('db',455,250,60,C.or,ol); txt(455,320,'Lakehouse',{size:18,anchor:'middle',weight:700,op:ol}); txt(455,345,'one feed',{size:14,anchor:'middle',fill:C.dim,op:ol}); txt(455,365,'per source',{size:14,anchor:'middle',fill:C.dim,op:ol});
+   // star schema
+   const om=fin(t,cue.model); arrow(530,285,575,285,{stroke:C.dim,op:om,sw:2.5});
+   const fx=740, fy=285;
+   const facts=[['Permissions',fx,215],['Activity',fx,375]];
+   const dims=[['Identity',648,276],['Workspace',834,276],['Item',740,440]];
+   dims.forEach(([d,x,y],i)=>{ const oo=fin(t,cue.model+.5+i*.4); facts.forEach(([f,a,b])=>line(x,y+18,a,b,{stroke:C.line,sw:1.5,op:oo})); });
+   dims.forEach(([d,x,y],i)=>{ const oo=fin(t,cue.model+.5+i*.4); rect(x-62,y,124,38,{fill:C.bl+'22',stroke:C.bl,op:oo,r:8}); txt(x,y+25,d,{size:16,anchor:'middle',op:oo}); });
+   facts.forEach(([f,x,y],i)=>{ const oo=fin(t,cue.model+.2+i*.3); rect(x-72,y-22,144,44,{fill:C.or+'30',stroke:C.or,op:oo,r:8,sw:2}); txt(x,y+6,f,{size:17,anchor:'middle',weight:700,op:oo}); });
+   txt(740,505,'dimensions · facts',{size:14,anchor:'middle',fill:C.dim,op:om});
+   // report
+   const or=fin(t,cue.report); arrow(915,285,950,285,{stroke:C.dim,op:or,sw:2.5});
+   rect(955,140,265,400,{fill:C.paper,stroke:C.pborder,op:or,r:12,sw:1}); rect(955,140,265,44,{fill:C.navy,stroke:'none',sw:0,op:or,r:12}); rect(955,170,265,14,{fill:C.navy,stroke:'none',sw:0,op:or,r:0});
+   txt(975,169,'Agent access review',{size:16,weight:700,op:or});
+   const ch=[['Admin roles across many workspaces',cue.c1,C.bad],['Access unused for 90 days',cue.c2,C.warn],['Agent touching a sensitive tier',cue.c3,C.bad],['Activity outside agreed workspaces',cue.c4,C.bad]];
+   ch.forEach(([s,c,col],i)=>{ const oo=fin(t,c); const y=198+i*82; rect(967,y,241,70,{fill:col==C.bad?'#fdecec':'#fdf4e3',stroke:col,op:oo,r:8,sw:1.5});
+     circ(988,y+22,9,{fill:col,stroke:'none',sw:0,op:oo}); txt(988,y+27,'!',{size:13,anchor:'middle',fill:'#fff',weight:700,op:oo});
+     wrap(s,22).forEach((l,k)=>txt(1005,y+28+k*21,l,{size:15,fill:C.ptext,op:oo,weight:k==0?700:400})); txt(1196,y+60,String([3,14,1,2][i]),{size:13,anchor:'end',fill:C.pmuted,op:oo}); });
+   txt(1088,560,'illustrative counts',{size:13,anchor:'middle',fill:C.dim,italic:true,op:or});
+   const ofam=fin(t,cue.familiar)*(1-fin(t,cue.model)); txt(64,500,'Familiar work for a data team:',{size:18,fill:C.dim,op:ofam}); txt(64,526,'land it, model it, report on it.',{size:18,fill:C.dim,op:ofam});
+ }],
+ ['review', t=>{
+   title(t,T.review,'Review and respond');
+   const on=fin(t,cue.nothing);
+   rect(64,150,330,220,{fill:C.box,stroke:C.line,op:on,r:14}); icon('doc',130,240,70,C.dim,on); txt(230,232,'A report',{size:22,weight:700,op:on}); txt(230,262,'on its own',{size:18,fill:C.dim,op:on}); txt(230,290,'changes nothing',{size:18,fill:C.dim,op:on});
+   const oo=fin(t,cue.own); arrow(400,260,470,260,{stroke:C.or,op:oo,sw:3});
+   rect(480,150,320,220,{fill:C.or+'16',stroke:C.or,op:oo,r:14,sw:2.5}); icon('review',560,245,80,C.or,oo);
+   txt(620,225,'Owned review',{size:21,weight:700,op:oo}); txt(620,255,'regular schedule,',{size:17,fill:C.dim,op:oo}); txt(620,280,'perhaps monthly',{size:17,fill:C.dim,op:oo});
+   const od=fin(t,cue.decide);
+   const acts=[['Remove','unused or unneeded access',C.red],['Tighten','roles wider than agreed',C.warn],['Investigate','unexpected activity',C.bl]];
+   acts.forEach(([a,b,col],i)=>{ const ox=fin(t,cue.decide+.8+i*.6); const y=150+i*76; arrow(805,260,850,y+32,{stroke:col,op:ox,sw:2}); rect(855,y,365,64,{fill:col+'18',stroke:col,op:ox,r:12}); txt(875,y+28,a,{size:20,weight:700,op:ox}); txt(875,y+51,b,{size:15,fill:C.dim,op:ox}); });
+   const ov=fin(t,cue.over); rect(64,400,560,70,{fill:C.red+'14',stroke:C.red,op:ov,r:12}); txt(88,432,'Most common finding: over-privileging',{size:20,weight:700,op:ov}); txt(88,457,'so start there',{size:16,fill:C.dim,op:ov});
+   const orc=fin(t,cue.recd);
+   rect(660,400,560,160,{fill:C.paper,stroke:C.pborder,op:orc,r:12,sw:1}); txt(680,428,'DECISION LOG',{size:14,weight:700,fill:C.navy,op:orc}); txt(1200,428,'illustrative',{size:12,fill:C.pmuted,italic:true,anchor:'end',op:orc});
+   [['Nov','sales-agent-sp','Contributor on 11 workspaces removed'],['Nov','Finance group','Access reviewed, kept: approved use'],['Oct','BI admins','Admin scope narrowed to 3 workspaces']].forEach((r,i)=>{ const oy=fin(t,cue.recd+.5+i*.5); const y=446+i*36; line(676,y,1204,y,{stroke:C.pborder,sw:1,op:orc});
+     txt(680,y+24,r[0],{size:14,fill:C.pmuted,op:oy}); txt(725,y+24,r[1],{size:14,fill:C.ptext,weight:700,op:oy}); txt(870,y+24,r[2],{size:14,fill:C.ptext,op:oy}); });
+ }],
+ ['outro', t=>{
+   const cs=[cue.s1,cue.s2,cue.s3];
+   QS.forEach(([q,ic,src,col],i)=>{ const oo=fin(t,cs[i]); const x=240+i*400;
+     circ(x,180,56,{fill:col+'1c',stroke:col,op:oo,sw:3}); icon(ic,x,182,64,col,oo);
+     txt(x,270,src,{size:21,anchor:'middle',weight:700,op:oo}); txt(x,298,['where agents operate','what they can access','what they do'][i],{size:18,anchor:'middle',fill:C.dim,op:oo});
+     line(x,315,x,350,{stroke:col,sw:2,op:fin(t,cue.s4)}); });
+   const o4=fin(t,cue.s4); path('M240,350 L1040,350',{stroke:C.dim,sw:2,op:o4}); arrow(640,350,640,388,{stroke:C.or,op:o4,sw:3});
+   pill(470,392,340,'Review and respond',C.or,o4,20,46,'26',C.ink,700);
+   const ok=fin(t,cue.keep); rect(140,470,1000,96,{fill:C.or+'1c',stroke:C.or,op:ok,r:14});
+   txt(640,508,'Keep checking that what agents can do, and what they are doing,',{size:24,anchor:'middle',weight:700,op:ok});
+   txt(640,544,'stays within the boundaries you agreed.',{size:24,anchor:'middle',weight:700,fill:C.or,op:fin(t,cue.keep+2)});
+ }],
+];
+
+const SENTS=[]; { let cur=null; for(const w of W){ if(!cur){cur={start:w.start,text:[]};} cur.text.push(w.text); cur.end=w.end; if(/[.?!]$/.test(w.text)){SENTS.push(cur);cur=null;} } if(cur)SENTS.push(cur); }
+function subtitle(t){ const s=SENTS.find(s=>t>=s.start-.05 && t<=s.end+.3); if(!s) return;
+  const lines=wrap(s.text.join(' '),98);
+  const h=lines.length*30+18; rect(140,714-h-4,1000,h,{fill:'#000000',stroke:'none',sw:0,r:8,op:.7});
+  lines.forEach((ln,i)=>txt(640,714-h-4+32+i*30,ln,{size:20.5,anchor:'middle'})); }
+
+window.render = function(t){
+  out=`<rect width="1280" height="720" fill="${C.bg}"/>`;
+  const keys=scenes.map(s=>T[s[0]]);
+  let idx=0; for(let i=0;i<scenes.length;i++) if(t>=keys[i]) idx=i;
+  const next = idx+1<scenes.length ? keys[idx+1] : END;
+  const fadeOut = clamp((next - t)/0.4);
+  out+=`<g opacity="${idx+1<scenes.length?fadeOut:1}">`; scenes[idx][1](t); out+='</g>';
+  rect(0,0,1280*clamp(t/END),4,{fill:C.or,stroke:'none',sw:0,r:0});
+  subtitle(t);
+  S.innerHTML=out;
+};
+render(0);
+const aud=document.getElementById('aud');
+document.getElementById('play').onclick=()=>{ aud.paused?aud.play():aud.pause(); };
+(function loop(){ if(!aud.paused) render(aud.currentTime); requestAnimationFrame(loop); })();
+</script>
+</body></html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testing and release frameworks – Difinity 2026 follow-up</title>
+<meta name="description" content="Testing and release frameworks: More output. Less review time.. A narrated follow-up video from the Difinity 2026 talk on AI agent governance.">
+<meta property="og:title" content="Testing and release frameworks – Difinity 2026 follow-up">
+<meta property="og:description" content="Testing and release frameworks: More output. Less review time.. A narrated follow-up video from the Difinity 2026 talk on AI agent governance.">
+<meta property="og:image" content="poster.jpg">
+<style>
+  :root{--bg:#f6f7f8;--ink:#0d1a3a;--mut:#56657a;--card:#fff;--line:#e0e6ea;--acc:#007f8a}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0f141c;--ink:#e6ebf0;--mut:#98a5b3;--card:#18202b;--line:#2a3442;--acc:#3fc1cb}}
+  :root[data-theme="dark"]{--bg:#0f141c;--ink:#e6ebf0;--mut:#98a5b3;--card:#18202b;--line:#2a3442;--acc:#3fc1cb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Segoe UI",system-ui,sans-serif}
+  main{max-width:980px;margin:0 auto;padding:24px 16px 48px}
+  h1{font-size:clamp(26px,5vw,38px);margin:0 0 4px;line-height:1.15}
+  h2{font-size:20px;margin:30px 0 8px}
+  a{color:var(--acc)}
+  .kicker{color:var(--acc);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px}
+  .sub{color:var(--mut);margin:0 0 18px}
+  video{width:100%;border-radius:12px;background:#000;display:block}
+  .row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .btn{padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none;font-weight:600}
+  ul li{margin:6px 0}
+  .small{color:var(--mut);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;text-decoration:none;color:var(--ink);display:flex;flex-direction:column}
+  .card img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#0d1a3a}
+  .card div{padding:12px 14px 16px}
+  .card b{display:block;font-size:18px;margin-bottom:4px}
+  .card span{color:var(--mut);font-size:14px}
+  .card:hover b{color:var(--acc)}
+  footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker"><a href="../">Difinity 2026 follow-up videos</a></p>
+  <h1>Testing and release frameworks</h1>
+  <p class="sub">More output. Less review time. · 5-minute narrated explainer · as of November 2026</p>
+  <video controls preload="metadata" poster="poster.jpg" playsinline>
+    <source src="testing_release.mp4" type="video/mp4">
+    Your browser cannot play this video. <a href="testing_release.mp4">Download the MP4</a>.
+  </video>
+  <div class="row">
+    <a class="btn" href="interactive.html">Interactive version (animation in the browser)</a>
+    <a class="btn" href="testing_release.mp4" download>Download MP4 (8 MB)</a>
+  </div>
+  <p>Agents can build models, write DAX and change reports in minutes, but review time hasn&#x27;t grown. Rare but consequential errors need repeatable checks.</p>
+  <h2>What it covers</h2>
+  <ul>
+    <li>Four steps for every change, by a person or an agent: develop, automated checks, review, release.</li>
+    <li>Develop in source control with the Power BI project format (TMDL for the model, PBIR for the report), so every change is a readable diff.</li>
+    <li>Automated checks: best practice rules for the semantic model (star schema, single-direction relationships, referential integrity, unused columns, descriptions), DAX correctness and performance tests, and report rules.</li>
+    <li>Review in a pull request, with a branch policy that blocks the merge when a high severity rule fails.</li>
+    <li>Release only what passed, through Fabric deployment pipelines or a Git-based process.</li>
+  </ul>
+  <p class="small">Sources (checked November 2026): Microsoft Learn: Power BI Project (PBIP) and Azure DevOps build pipelines for validation; Fabric deployment pipelines. Tabular Editor Best Practice Analyzer and PBI Inspector are community tools. Rule counts, figures and names on screen are illustrative.</p>
+  <footer class="small">Steve Fox / Analytics in Action · Follow-up videos for the Difinity 2026 talk “The First 90 Days of AI Agent Governance”. Narration: Phonon (Preston voice). Not affiliated with Microsoft.</footer>
+</main>
+</body>
+</html>

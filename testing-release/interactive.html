@@ -1,0 +1,356 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Testing and release</title>
+<style>
+html,body{margin:0;background:#0f1a2e;color:#eef2fa;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+#stage{width:1280px;height:720px;display:block}
+#ctl{position:fixed;left:12px;bottom:10px;z-index:5}
+#ctl button{font-size:16px;padding:6px 14px;background:#2fb8b4;color:#0f1a2e;font-weight:700;border:0;border-radius:6px;cursor:pointer}
+.rec #ctl{display:none}
+text{font-family:Arial,Helvetica,sans-serif}
+</style></head>
+<body>
+<svg id="stage" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="ctl"><button id="play">▶ Play</button></div>
+<audio id="aud" src="narration.mp3" preload="auto"></audio>
+<script src="words.js"></script>
+<script>
+const W = WORDS.words, S = document.getElementById('stage');
+if (location.hash === '#rec') document.body.classList.add('rec');
+const C = {bg:'#0f1a2e', ink:'#eef2fa', dim:'#9aa8c0', or:'#2fb8b4', bl:'#7fa8e6', gr:'#3fb27f', red:'#e46a6a', warn:'#e0a940',
+           box:'#18263f', line:'#33456a', navy:'#1c2b4a', code:'#0b1424'};
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g,'');
+function at(phrase, after=0){
+  const p = phrase.split(/\s+/).map(norm);
+  for (let i=0;i<W.length;i++){
+    if (W[i].start < after) continue;
+    let ok = true;
+    for (let j=0;j<p.length;j++){ if (!W[i+j] || norm(W[i+j].text)!==p[j]) {ok=false;break;} }
+    if (ok) return W[i].start;
+  }
+  console.error('phrase not found: '+phrase); return 1e9;
+}
+const END = W[W.length-1].end + 1.5;
+const T = {
+  intro: 0,
+  problem: at('Most changes are fine'),
+  flow: at('So the framework has'),
+  develop: at('Step one is to develop'),
+  model: at('Step two is the automated'),
+  bpa: at('The Best Practice Analyzer in'),
+  dax: at('The second group checks'),
+  report: at('The third group checks'),
+  review: at('Step three is review'),
+  release: at('Step four is release'),
+  start: at('You do not need a large'),
+  outro: at('The tools matter less'),
+};
+const cue = {
+  more: at('That means more output'), review0: at('But the time we'), pbip: at('This video shows how'),
+  trouble: at('The trouble is'), dup: at('A relationship that duplicates'), ren: at('A renamed column'), cost: at('These errors are uncommon'), quick: at('And because they are'), rare: at('Rare but consequential'),
+  f1: at('Develop', T.flow), f2: at('Run automated checks'), f3: at('Review', T.flow+2), f4: at('Then release', T.flow), every: at('Every change goes'),
+  folders: at('The Power BI project format'), tmdl: at('The model is stored'), text: at('Each table relationship'), diff: at('So every change shows'),
+  star: at('Is it a star'), dir: at('Are relationships one'), bidi: at('Bidirectional relationships are'), ri: at('Are there fact rows'), blank: at('That is a referential'), unused: at('Are there columns'), remove: at('Remove them'), desc: at('And do tables columns'), agents: at('Those descriptions help'),
+  std: at('You start with a'), sev: at('Each rule has a'), fail: at('can fail the build'),
+  right: at('Does each measure give'), corr: at('Correctness tests compare'), closed: at('For example total sales'), perf: at('Performance tests time'), caught: at('The double counted revenue'),
+  insp: at('Community tools such as'), typ: at('Typical rules flag'), missing: at('visuals that point at'), settings: at('and report settings'),
+  results: at('A person still looks'), predict: at('The rules handle'), q1: at('Does this measure mean'), q2: at('Should an agent have'), pr: at('In Git this happens'), policy: at('A branch policy can'),
+  only: at('Only changes that pass'), pipe: at('In Fabric deployment pipelines'), git: at('Other teams use'), rec: at('Either way there'),
+  ado: at('You can run these'), agent: at('Or you can use'), few: at('Start with a few'), addmore: at('Add more each'),
+  o1: at('Develop', T.outro), o2: at('Run the checks', T.outro), o3: at('Review the results', T.outro), o4: at('Then release', T.outro), last: at('That is how a team'),
+};
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>{x=clamp(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2};
+const fin=(t,t0,d=.5)=>ease((t-t0)/d);
+let out='';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function txt(x,y,s,{size=28,fill=C.ink,anchor='start',weight=400,op=1,mono=false,deco=''}={}){ if(op<=0)return; out+=`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}" opacity="${op}"${mono?' style="font-family:Consolas,Menlo,monospace;white-space:pre"':''}${deco?` text-decoration="${deco}"`:''}>${esc(s)}</text>`; }
+function rect(x,y,w,h,{fill=C.box,stroke=C.line,sw=2,r=10,op=1,dash=''}={}){ if(op<=0)return; out+=`<rect x="${x}" y="${y}" width="${Math.max(0,w)}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function circ(x,y,r,{fill=C.box,stroke=C.line,sw=2,op=1}={}){ if(op<=0)return; out+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"/>`; }
+function line(x1,y1,x2,y2,{stroke=C.dim,sw=2,op=1,dash=''}={}){ if(op<=0)return; out+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function path(d,{stroke=C.dim,sw=2,op=1,fill='none'}={}){ if(op<=0)return; out+=`<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`; }
+function head(x,y,a,col,op,L=12){ out+=`<polygon points="${x},${y} ${x-L*Math.cos(a-.4)},${y-L*Math.sin(a-.4)} ${x-L*Math.cos(a+.4)},${y-L*Math.sin(a+.4)}" fill="${col}" opacity="${op}"/>`; }
+function arrow(x1,y1,x2,y2,o={}){ line(x1,y1,x2,y2,o); const op=o.op??1; if(op<=0)return; head(x2,y2,Math.atan2(y2-y1,x2-x1),o.stroke||C.dim,op); }
+function tick(x,y,s,col,op,sw=3){ path(`M${x-s*.5},${y} L${x-s*.12},${y+s*.38} L${x+s*.55},${y-s*.4}`,{stroke:col,sw,op}); }
+function cross(x,y,s,col,op,sw=3){ line(x-s/2,y-s/2,x+s/2,y+s/2,{stroke:col,sw,op}); line(x+s/2,y-s/2,x-s/2,y+s/2,{stroke:col,sw,op}); }
+function bang(x,y,s,col,op){ line(x,y-s*.45,x,y+s*.1,{stroke:col,sw:3.5,op}); circ(x,y+s*.38,2.5,{fill:col,stroke:'none',sw:0,op}); }
+function badge(x,y,r,kind,op){ const col=kind==='ok'?C.gr:kind==='warn'?C.warn:C.red; circ(x,y,r,{fill:col,stroke:'none',sw:0,op}); if(kind==='ok') tick(x,y,r*.9,C.bg,op,3); else if(kind==='warn') bang(x,y,r*1.1,C.bg,op); else cross(x,y,r*.8,C.bg,op); }
+function title(t,t0,s,sub){ const o=fin(t,t0); txt(64,150,s,{size:34,weight:700,op:o}); if(sub) txt(64,182,sub,{size:19,fill:C.dim,op:o}); }
+function pill(x,y,w,label,col,op,size=18,h=40,tcol=C.ink){ rect(x,y,w,h,{fill:col+'22',stroke:col,op,r:h/2}); txt(x+w/2,y+h/2+size*.36,label,{size,anchor:'middle',op,fill:tcol}); }
+function wrap(s,n){ const ls=[]; let l=''; for(const w of s.split(' ')){ if((l+' '+w).length>n&&l){ls.push(l);l=w;} else l=l?l+' '+w:w; } ls.push(l); return ls; }
+function illus(op){ txt(1216,620,'Illustrative',{size:14,fill:C.dim,anchor:'end',op}); }
+
+// icons for the four steps
+function icon(kind,x,y,s,col,op){ if(op<=0) return; const k=s/60;
+  if(kind==='dev'){ rect(x-26*k,y-20*k,52*k,34*k,{fill:col+'22',stroke:col,sw:3,op,r:4}); line(x-32*k,y+20*k,x+32*k,y+20*k,{stroke:col,sw:3,op}); path(`M${x-8*k},${y-9*k} L${x-15*k},${y-3*k} L${x-8*k},${y+3*k} M${x+8*k},${y-9*k} L${x+15*k},${y-3*k} L${x+8*k},${y+3*k}`,{stroke:col,sw:2.5,op}); }
+  if(kind==='check'){ rect(x-20*k,y-26*k,40*k,52*k,{fill:col+'22',stroke:col,sw:3,op,r:5}); [-12,2,16].forEach(d=>{ tick(x-9*k,y+d*k-2*k,9*k,col,op,2.5); line(x,y+d*k,x+12*k,y+d*k,{stroke:col,op,sw:2.5}); }); }
+  if(kind==='review'){ circ(x-8*k,y-8*k,10*k,{fill:col+'33',stroke:col,op}); path(`M${x-26*k},${y+24*k} Q${x-8*k},${y-2*k} ${x+10*k},${y+24*k} Z`,{stroke:col,fill:col+'33',op}); rect(x+6*k,y-26*k,26*k,18*k,{fill:col+'22',stroke:col,sw:2.5,op,r:4}); }
+  if(kind==='release'){ rect(x-26*k,y-22*k,52*k,44*k,{fill:col+'22',stroke:col,sw:3,op,r:5}); line(x-26*k,y-11*k,x+26*k,y-11*k,{stroke:col,sw:2.5,op}); tick(x,y+6*k,18*k,col,op,3.5); }
+}
+const STEPS=[['Develop','dev'],['Automated checks','check'],['Review','review'],['Release','release']];
+function stepper(cur,op){
+  STEPS.forEach(([s,ic],i)=>{ const x=64+i*292, w=268; const act=i===cur, done=i<cur; const col=act?C.or:done?C.bl:C.line;
+    rect(x,30,w,50,{fill:act?C.or+'30':C.box,stroke:col,op,r:25,sw:act?3:2});
+    circ(x+26,55,15,{fill:act?C.or:done?C.bl:C.bg,stroke:col,op,sw:2});
+    if(done) tick(x+26,55,14,C.bg,op,3); else txt(x+26,61,String(i+1),{size:16,anchor:'middle',weight:700,op,fill:act?C.navy:C.dim});
+    txt(x+50,61,s,{size:17,weight:act?700:400,op,fill:act||done?C.ink:C.dim});
+    if(i<3) line(x+w+4,55,x+w+20,55,{stroke:C.line,op,sw:2}); });
+}
+// a rule row: label + result badge
+function rule(x,y,w,label,kind,op,note){ if(op<=0) return; rect(x,y,w,48,{fill:C.box,stroke:kind==='ok'?C.line:(kind==='warn'?C.warn:C.red),op,r:10,sw:kind==='ok'?1.5:2.5});
+  badge(x+26,y+24,13,kind,op); txt(x+50,y+30,label,{size:18,op}); if(note) txt(x+w-16,y+30,note,{size:15,fill:kind==='ok'?C.dim:(kind==='warn'?C.warn:C.red),anchor:'end',op,weight:700}); }
+
+const scenes = [
+ ['intro', t=>{
+   txt(640,170,'DIFINITY 2026 · FOLLOW-UP',{size:18,anchor:'middle',fill:C.or,weight:700,op:fin(t,.1,.8)});
+   txt(640,240,'Testing and release frameworks',{size:50,anchor:'middle',weight:700,op:fin(t,.4,.8)});
+   txt(640,286,'More output. Less review time.',{size:26,anchor:'middle',fill:C.dim,op:fin(t,1,.8)});
+   // output vs review bars
+   const o1=fin(t,cue.more), o2=fin(t,cue.review0);
+   const g=clamp((t-cue.more)/4);
+   txt(330,372,'Output',{size:20,anchor:'end',op:o1}); rect(350,350,560*ease(g)+60,30,{fill:C.or,stroke:'none',sw:0,op:o1,r:6});
+   txt(330,432,'Review time',{size:20,anchor:'end',op:o2}); rect(350,410,140,30,{fill:C.bl,stroke:'none',sw:0,op:o2,r:6});
+   txt(510,432,'unchanged',{size:17,fill:C.dim,op:o2});
+   const o3=fin(t,cue.pbip);
+   ['Power BI project (PBIP)','Semantic model rules','Report rules'].forEach((s,i)=>pill(255+i*265,500,250,s,C.or,fin(t,cue.pbip+.4+i*.5)));
+ }],
+ ['problem', t=>{
+   title(t,T.problem,'Most changes are fine. A few are not.');
+   const bad=fin(t,cue.trouble);
+   for(let i=0;i<12;i++){ const x=110+(i%6)*78, y=260+Math.floor(i/6)*80, isBad=i===4; const o=fin(t,T.problem+.2+i*.08,.3);
+     badge(x,y,28,isBad&&bad>0.5?'warn':'ok',o); }
+   const oc=fin(t,cue.dup);
+   rect(640,220,580,100,{op:oc,stroke:C.warn,sw:2});
+   txt(664,258,'Relationship duplicates rows',{size:21,weight:700,op:oc});
+   txt(664,292,'Revenue $4.8M shows as $9.6M',{size:19,fill:C.warn,op:oc});
+   const or=fin(t,cue.ren);
+   rect(640,336,580,100,{op:or,stroke:C.warn,sw:2});
+   txt(664,374,'Column renamed in the model',{size:21,weight:700,op:or});
+   txt(664,408,'Three reports quietly break',{size:19,fill:C.warn,op:or});
+   const oq=fin(t,cue.quick);
+   txt(110,410,'A quick look at each change',{size:19,fill:C.dim,op:oq});
+   txt(110,436,'will not reliably find them.',{size:19,fill:C.dim,op:oq});
+   const ob=fin(t,cue.rare);
+   rect(140,480,1000,70,{fill:C.or+'1c',stroke:C.or,op:ob,r:12});
+   txt(640,524,'Rare but consequential errors need repeatable checks.',{size:27,anchor:'middle',weight:700,op:ob});
+   illus(oc);
+ }],
+ ['flow', t=>{
+   title(t,T.flow,'Four steps, every change');
+   const cs=[cue.f1,cue.f2,cue.f3,cue.f4];
+   STEPS.forEach(([s,ic],i)=>{ const x=190+i*300, o=fin(t,cs[i]);
+     circ(x,320,70,{fill:C.or+'1c',stroke:C.or,sw:3,op:o}); icon(ic,x,322,74,C.or,o);
+     txt(x,430,s,{size:24,anchor:'middle',weight:700,op:o});
+     if(i<3) arrow(x+82,320,x+214,320,{stroke:C.line,sw:3,op:fin(t,cs[i+1]-.3)}); });
+   const oe=fin(t,cue.every);
+   pill(330,500,280,'Made by a person',C.bl,oe,19,44); pill(670,500,280,'Made by an agent',C.or,fin(t,cue.every+1.2),19,44);
+   txt(640,575,'same steps either way',{size:18,fill:C.dim,anchor:'middle',op:oe});
+ }],
+ ['develop', t=>{
+   stepper(0,fin(t,T.develop));
+   title(t,T.develop,'Develop in source control','The Power BI project format (PBIP) saves everything as text files');
+   // closed file vs folders
+   const of=fin(t,cue.folders);
+   rect(64,220,170,120,{op:of,fill:C.box,stroke:C.line,dash:'6 5'});
+   txt(149,272,'One closed',{size:17,anchor:'middle',fill:C.dim,op:of}); txt(149,296,'.pbix file',{size:17,anchor:'middle',fill:C.dim,op:of});
+   arrow(244,280,296,280,{stroke:C.or,sw:3,op:fin(t,cue.folders+1)});
+   const ot=fin(t,cue.folders+1.4);
+   rect(306,206,420,370,{fill:C.code,stroke:C.line,op:ot,r:10});
+   const tree=[['Sales.pbip',0,'f'],['Sales.Report/',0,'d'],['definition/',1,'d'],['pages/ … visuals/ … visual.json',2,'p'],['Sales.SemanticModel/',0,'d'],['definition/',1,'d'],['model.tmdl',2,'m'],['relationships.tmdl',2,'m'],['tables/',2,'d'],['Sales.tmdl',3,'m'],['Product.tmdl',3,'m'],['Date.tmdl',3,'m']];
+   tree.forEach(([s,d,k],i)=>{ const o=fin(t,cue.folders+1.6+i*.12,.3); const hl=(k==='m'&&t>=cue.tmdl)||(k==='p'&&t>=cue.tmdl+3);
+     txt(326+d*22,240+i*28,s,{size:16,mono:true,op:o,fill:hl?C.or:(k==='d'?C.bl:C.ink),weight:hl?700:400}); });
+   const om=fin(t,cue.tmdl);
+   pill(560,476,150,'TMDL: model',C.or,om,15,32); pill(560,516,150,'PBIR: report',C.or,fin(t,cue.tmdl+3),15,32);
+   // git diff
+   const od=fin(t,cue.diff);
+   rect(756,206,460,370,{fill:C.code,stroke:C.line,op:od,r:10});
+   txt(776,236,'Git diff · tables/Sales.tmdl',{size:15,fill:C.dim,op:od,mono:true});
+   const dl=[[' ','measure \'Total Sales\' =',C.ink],['-','    SUM(Sales[Amount])',C.red],['+','    SUMX(Sales,',C.gr],['+','      Sales[Qty] * Sales[Price])',C.gr],[' ','  formatString: $#,0',C.ink],[' ','',C.ink],['+','  description: Sales value',C.gr],['+','    excluding GST',C.gr]];
+   dl.forEach(([m,s,c],i)=>{ const o=fin(t,cue.diff+.4+i*.15,.3); if(m!==' ') rect(768,256+i*30,436,26,{fill:c+'22',stroke:'none',sw:0,op:o,r:3});
+     txt(778,274+i*30,m+' '+s,{size:15,mono:true,fill:c,op:o}); });
+   txt(986,540,'every change is readable',{size:17,fill:C.dim,anchor:'middle',op:fin(t,cue.diff+2)});
+   txt(986,566,'and can be checked by rules',{size:17,fill:C.dim,anchor:'middle',op:fin(t,cue.diff+2.4)});
+   illus(od);
+ }],
+ ['model', t=>{
+   stepper(1,fin(t,T.model));
+   title(t,T.model,'Automated checks: the semantic model','Best practice rules, run against the model files');
+   // star schema diagram
+   const os=fin(t,cue.star);
+   const F={x:330,y:390}, D=[['Date',190,260],['Product',470,260],['Customer',190,520],['Store',470,520]];
+   D.forEach(([n,x,y],i)=>{ const isBi=n==='Customer'; const ob=fin(t,cue.bidi);
+     const col=isBi&&t>=cue.bidi?C.warn:C.line;
+     line(x,y,F.x,F.y,{stroke:col,sw:isBi&&t>=cue.bidi?3:2.5,op:os});
+     const a=Math.atan2(F.y-y,F.x-x); const mx=(x+F.x)/2, my=(y+F.y)/2;
+     if(t>=cue.dir) head(mx+Math.cos(a)*10,my+Math.sin(a)*10,a,isBi&&t>=cue.bidi?C.warn:C.dim,fin(t,cue.dir));
+     if(isBi&&t>=cue.bidi) head(mx-Math.cos(a)*10,my-Math.sin(a)*10,a+Math.PI,C.warn,ob);
+     rect(x-70,y-24,140,48,{fill:C.navy,stroke:C.bl,op:os}); txt(x,y+6,n,{size:18,anchor:'middle',op:os}); });
+   rect(F.x-80,F.y-30,160,60,{fill:C.bg,stroke:'none',sw:0,op:os}); rect(F.x-80,F.y-30,160,60,{fill:C.or+'26',stroke:C.or,sw:3,op:os}); txt(F.x,F.y+7,'Sales (fact)',{size:19,anchor:'middle',weight:700,op:os});
+   if(t>=cue.bidi) { const ob=fin(t,cue.bidi); txt(140,600,'both directions',{size:15,fill:C.warn,op:ob}); }
+   // rules list
+   const R=[['Star schema: facts and dimensions','ok',cue.star,''],['Single-direction relationships','warn',cue.dir,'1 bidirectional'],['Referential integrity','err',cue.ri,'214 orphan keys'],['No unused columns','warn',cue.unused,'6 unused'],['Descriptions on tables, columns, measures','warn',cue.desc,'38 missing']];
+   R.forEach(([s,k,c,n],i)=>{ const kk = (i===1&&t<cue.bidi)?'ok':k; rule(640,206+i*62,576,s,kk,fin(t,c),kk==='ok'?'':n); });
+   // blank row callout
+   const obl=fin(t,cue.blank);
+   rect(640,522,280,74,{fill:C.code,stroke:C.red,op:obl,r:8});
+   txt(656,542,'Product      Sales',{size:15,mono:true,fill:C.dim,op:obl}); txt(656,564,'Bikes      $2.1M',{size:15,mono:true,op:obl}); txt(656,586,'(Blank)    $0.3M',{size:15,mono:true,fill:C.red,op:obl,weight:700});
+   const oa=fin(t,cue.agents);
+   rect(936,522,280,74,{fill:C.or+'1c',stroke:C.or,op:oa,r:8});
+   txt(1076,552,'Descriptions tell agents',{size:16,anchor:'middle',op:oa}); txt(1076,576,'what a field means',{size:16,anchor:'middle',op:oa});
+   const orm=fin(t,cue.remove); if(t>=cue.remove && t<cue.desc+1) txt(1206,482,'smaller model',{size:14,fill:C.dim,anchor:'end',op:orm});
+   illus(os);
+ }],
+ ['bpa', t=>{
+   stepper(1,1);
+   title(t,T.bpa,'Best Practice Analyzer','Tabular Editor runs the rules against the model files');
+   const os=fin(t,cue.std);
+   [['Standard rule set',C.bl],['Switch off what does not suit',C.dim],['Add your own rules',C.or]].forEach(([s,c],i)=>pill(64+i*390,210,360,s,c,fin(t,cue.std+i*1.6),18,44));
+   // results table
+   const ot=fin(t,T.bpa+.6);
+   rect(64,280,1152,260,{fill:C.code,stroke:C.line,op:ot,r:10});
+   const hx=[90,720,920,1060];
+   ['Rule','Severity','Objects','Result'].forEach((h,i)=>txt(hx[i],314,h,{size:16,fill:C.dim,weight:700,op:ot}));
+   line(80,326,1200,326,{stroke:C.line,op:ot,sw:1});
+   const rows=[['Avoid bidirectional relationships','Error','1','fail'],['Use DIVIDE for division','Warning','2','warn'],['Hide foreign key columns','Warning','5','warn'],['Add descriptions to visible objects','Warning','38','warn']];
+   const sevOn=fin(t,cue.sev);
+   rows.forEach((r,i)=>{ const y=362+i*44, o=fin(t,T.bpa+1+i*.3,.3); const err=r[1]==='Error';
+     txt(hx[0],y,r[0],{size:18,op:o}); txt(hx[1],y,r[1],{size:18,op:o,fill:sevOn>0&&err?C.red:(sevOn>0?C.warn:C.ink),weight:sevOn>0?700:400}); txt(hx[2],y,r[2],{size:18,op:o});
+     badge(hx[3]+12,y-6,12,r[3]==='fail'?'err':'warn',o); txt(hx[3]+34,y,r[3]==='fail'?'Fails build':'Warning',{size:16,op:o,fill:r[3]==='fail'?C.red:C.warn}); });
+   const of=fin(t,cue.fail);
+   rect(390,556,500,52,{fill:C.red+'22',stroke:C.red,op:of,r:10});
+   cross(426,582,18,C.red,of); txt(456,589,'Build failed: 1 error, 3 warnings',{size:20,weight:700,op:of});
+   illus(ot);
+ }],
+ ['dax', t=>{
+   stepper(1,1);
+   title(t,T.dax,'Automated checks: DAX','Right answer, fast enough');
+   // correctness
+   const oc=fin(t,cue.corr);
+   rect(64,210,560,370,{op:oc}); txt(88,246,'Correctness test',{size:22,weight:700,op:oc});
+   txt(88,286,'Total Sales, September (closed month)',{size:17,fill:C.dim,op:fin(t,cue.closed)});
+   const ok2=fin(t,cue.closed+1);
+   txt(88,336,'Expected',{size:18,fill:C.dim,op:ok2}); txt(600,336,'$4,812,300',{size:24,anchor:'end',weight:700,op:ok2});
+   txt(88,360,'signed off by finance',{size:14,fill:C.dim,op:ok2});
+   const oa=fin(t,cue.caught);
+   txt(88,412,'Actual',{size:18,fill:C.dim,op:oa}); txt(600,412,'$9,624,600',{size:24,anchor:'end',weight:700,fill:C.red,op:oa});
+   rect(88,450,512,100,{fill:C.red+'1c',stroke:C.red,op:oa,r:8}); badge(122,500,15,'err',oa);
+   txt(150,492,'Test failed: double counting',{size:19,weight:700,op:oa}); txt(150,520,'caught before release',{size:17,fill:C.dim,op:oa});
+   // performance
+   const op=fin(t,cue.perf);
+   rect(656,210,560,370,{op}); txt(680,246,'Performance test',{size:22,weight:700,op});
+   const Q=[['Sales by month',0.4,0.42],['Margin by product',0.9,0.95],['Customer churn',1.1,3.1],['Top 10 stores',0.5,0.5]];
+   txt(680,284,'Query time (seconds): before vs after',{size:15,fill:C.dim,op});
+   Q.forEach(([n,a,b],i)=>{ const y=310+i*62, o=fin(t,cue.perf+.5+i*.3,.3), sc=90, slow=b>a*1.5;
+     txt(680,y+14,n,{size:16,op:o}); rect(860,y,a*sc,14,{fill:C.bl,stroke:'none',sw:0,op:o,r:3}); rect(860,y+18,b*sc,14,{fill:slow?C.warn:C.or,stroke:'none',sw:0,op:o,r:3});
+     if(slow) txt(860+b*sc+10,y+30,'+180%',{size:15,fill:C.warn,weight:700,op:fin(t,cue.perf+2.5)}); });
+   txt(680,560,'before',{size:14,fill:C.bl,op}); txt(740,560,'after',{size:14,fill:C.or,op});
+   illus(oc);
+ }],
+ ['report', t=>{
+   stepper(1,1);
+   title(t,T.report,'Automated checks: the report','Rules applied to the report files, for example with PBI Inspector');
+   // report page mock with many visuals
+   const op=fin(t,T.report+.3);
+   rect(64,210,600,380,{fill:'#f5f7fb',stroke:C.line,op,r:8});
+   const vis=[[80,226,180,90],[270,226,180,90],[460,226,190,90],[80,326,280,120],[370,326,140,120],[520,326,130,58],[520,392,130,54],[80,456,130,120],[220,456,130,120],[360,456,140,58],[360,518,140,58],[510,456,140,120]];
+   const crowd=fin(t,cue.typ);
+   vis.forEach(([x,y,w,h],i)=>{ const miss=i===4&&t>=cue.missing;
+     rect(x,y,w,h,{fill:miss?'#fde8e8':'#ffffff',stroke:miss?C.red:(crowd>0.5?C.warn:'#c9d1de'),op,r:4,sw:miss?3:1.5});
+     if(miss){ cross(x+w/2,y+h/2-10,26,C.red,op,4); txt(x+w/2,y+h/2+28,'missing field',{size:13,fill:C.red,anchor:'middle',op,weight:700}); }
+     else { [0,1,2].forEach(j=>rect(x+12+j*((w-24)/3),y+h-14-(10+((i*7+j*13)%5)*8),(w-24)/3-6,10+((i*7+j*13)%5)*8,{fill:'#7fa8e6',stroke:'none',sw:0,op:op*.8,r:2})); } });
+   const R=[['Too many visuals on one page','warn',cue.typ,'12 visuals'],['Visual uses a field that no longer exists','err',cue.missing,'Region Name'],['Report settings follow your standards','warn',cue.settings,'theme, filters']];
+   R.forEach(([s,k,c,n],i)=>rule(690,240+i*70,526,s,k,fin(t,c),n));
+   const oi=fin(t,cue.insp);
+   txt(690,500,'Report files (PBIR) are text too,',{size:18,fill:C.dim,op:oi});
+   txt(690,526,'so the same idea applies to the report.',{size:18,fill:C.dim,op:oi});
+   illus(op);
+ }],
+ ['review', t=>{
+   stepper(2,fin(t,T.review));
+   title(t,T.review,'Review: people focus on judgement');
+   // pull request card
+   const op=fin(t,cue.results);
+   rect(64,206,640,390,{fill:C.code,stroke:C.line,op,r:10});
+   txt(88,240,'Pull request · Add margin measures',{size:20,weight:700,op}); txt(88,266,'feature/margin → main',{size:15,mono:true,fill:C.dim,op});
+   const ch=[['Model rules (Best Practice Analyzer)','ok'],['DAX tests: correctness and timing','ok'],['Report rules','ok']];
+   ch.forEach(([s,k],i)=>{ const o=fin(t,cue.results+.6+i*.4); badge(104,306+i*44,13,k,o); txt(128,312+i*44,s,{size:18,op:o}); });
+   const opr=fin(t,cue.pr);
+   line(88,436,680,436,{stroke:C.line,op:opr,sw:1});
+   txt(88,468,'Reviewer',{size:16,fill:C.dim,op:opr}); pill(180,446,150,'Approve',C.gr,opr,16,34);
+   const opol=fin(t,cue.policy);
+   rect(88,500,592,76,{fill:C.or+'1c',stroke:C.or,op:opol,r:8});
+   txt(108,530,'Branch policy on main',{size:18,weight:700,op:opol});
+   txt(108,558,'Checks run on every pull request. A high-severity fail blocks the merge.',{size:15,fill:C.dim,op:opol});
+   // judgement questions
+   const oj=fin(t,cue.predict);
+   txt(740,236,'Rules handle the predictable.',{size:20,fill:C.dim,op:oj});
+   txt(740,264,'People handle the judgement.',{size:20,weight:700,op:fin(t,cue.predict+1.5)});
+   [['Does this measure mean what','the business means by it?',cue.q1],['Should an agent have made','this change at all?',cue.q2]].forEach(([a,b,c],i)=>{ const o=fin(t,c);
+     rect(740,300+i*110,476,90,{fill:C.navy,stroke:C.bl,op:o,r:14}); txt(764,338+i*110,a,{size:19,op:o}); txt(764,366+i*110,b,{size:19,op:o}); });
+ }],
+ ['release', t=>{
+   stepper(3,fin(t,T.release));
+   title(t,T.release,'Release: only what passed moves on');
+   const op=fin(t,cue.pipe);
+   const st=[['Development',C.bl],['Test',C.bl],['Production',C.or]];
+   st.forEach(([s,c],i)=>{ const x=100+i*380, o=fin(t,cue.pipe+.5+i*.9);
+     rect(x,230,300,110,{fill:c+'1c',stroke:c,sw:3,op:o,r:14}); txt(x+150,280,s,{size:24,anchor:'middle',weight:700,op:o}); txt(x+150,312,'workspace',{size:16,anchor:'middle',fill:C.dim,op:o});
+     if(i<2) arrow(x+310,285,x+370,285,{stroke:C.or,sw:3,op:fin(t,cue.pipe+1+i*.9)}); });
+   const oo=fin(t,cue.only); txt(640,206,'checks passed + review approved',{size:17,anchor:'middle',fill:C.gr,op:oo});
+   txt(640,376,'Fabric deployment pipelines, or a Git-based release process',{size:19,anchor:'middle',fill:C.dim,op:fin(t,cue.git)});
+   const or=fin(t,cue.rec);
+   rect(300,410,680,170,{fill:C.code,stroke:C.line,op:or,r:10});
+   txt(324,442,'Release record',{size:18,weight:700,op:or});
+   [['What changed','Margin measures, Sales.tmdl'],['Approved by','Data model owner'],['When','14 Nov 2026, 16:40']].forEach(([a,b],i)=>{ const o=fin(t,cue.rec+.6+i*.6); txt(324,480+i*32,a,{size:17,fill:C.dim,op:o}); txt(500,480+i*32,b,{size:17,op:o}); });
+   illus(or);
+ }],
+ ['start', t=>{
+   title(t,T.start,'Start small');
+   const ops=[['Azure DevOps','pipeline on each pull request',cue.ado],['GitHub','actions on each pull request',cue.ado+.8],['Your agentic tools','agent runs the rules, a person reviews',cue.agent]];
+   ops.forEach(([a,b,c],i)=>{ const x=64+i*390, o=fin(t,c); rect(x,206,362,140,{op:o,stroke:i===2?C.or:C.line,sw:i===2?3:2,r:14});
+     icon('check',x+50,276,56,i===2?C.or:C.bl,o); txt(x+96,262,a,{size:22,weight:700,op:o}); wrap(b,26).forEach((l,j)=>txt(x+96,292+j*24,l,{size:17,fill:C.dim,op:o})); });
+   const of=fin(t,cue.few);
+   rect(140,390,1000,80,{fill:C.or+'1c',stroke:C.or,op:of,r:12});
+   txt(640,438,'Start with the rules that would have caught your last real error.',{size:24,anchor:'middle',weight:700,op:of});
+   const oa=fin(t,cue.addmore);
+   [0,1,2,3,4,5,6].forEach(i=>badge(424+i*72,530,20,'ok',fin(t,cue.addmore+i*.25,.3)));
+   txt(640,590,'add a rule each time you find a new kind of error',{size:18,anchor:'middle',fill:C.dim,op:oa});
+ }],
+ ['outro', t=>{
+   const cs=[cue.o1,cue.o2,cue.o3,cue.o4];
+   txt(640,160,'The discipline',{size:22,anchor:'middle',fill:C.or,weight:700,op:fin(t,T.outro)});
+   STEPS.forEach(([s,ic],i)=>{ const x=190+i*300, o=fin(t,cs[i]);
+     circ(x,280,62,{fill:C.or+'1c',stroke:C.or,sw:3,op:o}); icon(ic,x,282,66,C.or,o);
+     txt(x,380,s,{size:22,anchor:'middle',weight:700,op:o});
+     if(i<3) arrow(x+74,280,x+226,280,{stroke:C.line,sw:3,op:fin(t,cs[i+1]-.3)}); });
+   const ol=fin(t,cue.last);
+   txt(640,448,'More output. Less review time.',{size:34,anchor:'middle',weight:700,op:ol});
+   txt(640,490,'Fewer surprises in production.',{size:26,anchor:'middle',fill:C.or,op:fin(t,cue.last+2.5)});
+   rect(140,525,1000,62,{fill:C.or+'1c',stroke:C.or,op:fin(t,cue.last+4),r:12});
+   txt(640,564,'Rare but consequential errors need repeatable checks.',{size:24,anchor:'middle',weight:700,op:fin(t,cue.last+4)});
+ }],
+];
+
+const SHOW = {'T-M-D-L':'TMDL','P-B-I-R':'PBIR','P-B-I':'PBI'};
+const SENTS=[]; { let cur=null; for(const w of W){ if(!cur){cur={start:w.start,text:[]};} let x=w.text; for(const k in SHOW) x=x.split(k).join(SHOW[k]); cur.text.push(x); cur.end=w.end; if(/[.?!]$/.test(w.text)){SENTS.push(cur);cur=null;} } if(cur)SENTS.push(cur); }
+function subtitle(t){ const s=SENTS.find(s=>t>=s.start-.05 && t<=s.end+.3); if(!s) return;
+  const lines=wrap(s.text.join(' '),98);
+  const h=lines.length*30+18; rect(140,714-h-4,1000,h,{fill:'#000000',stroke:'none',sw:0,r:8,op:.7});
+  lines.forEach((ln,i)=>txt(640,714-h-4+32+i*30,ln,{size:20.5,anchor:'middle'})); }
+
+window.render = function(t){
+  out=`<rect width="1280" height="720" fill="${C.bg}"/>`;
+  const keys=scenes.map(s=>T[s[0]]);
+  let idx=0; for(let i=0;i<scenes.length;i++) if(t>=keys[i]) idx=i;
+  const next = idx+1<scenes.length ? keys[idx+1] : END;
+  const fadeOut = clamp((next - t)/0.4);
+  out+=`<g opacity="${idx+1<scenes.length?fadeOut:1}">`; scenes[idx][1](t); out+='</g>';
+  rect(0,0,1280*clamp(t/END),4,{fill:C.or,stroke:'none',sw:0,r:0});
+  subtitle(t);
+  S.innerHTML=out;
+};
+render(0);
+const aud=document.getElementById('aud');
+document.getElementById('play').onclick=()=>{ aud.paused?aud.play():aud.pause(); };
+(function loop(){ if(!aud.paused) render(aud.currentTime); requestAnimationFrame(loop); })();
+</script>
+</body></html>

@@ -1,0 +1,332 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Data risk tiers</title>
+<style>
+html,body{margin:0;background:#0f1a2e;color:#eef2fa;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+#stage{width:1280px;height:720px;display:block}
+#ctl{position:fixed;left:12px;bottom:10px;z-index:5}
+#ctl button{font-size:16px;padding:6px 14px;background:#2fb8b4;color:#0f1a2e;font-weight:700;border:0;border-radius:6px;cursor:pointer}
+.rec #ctl{display:none}
+text{font-family:Arial,Helvetica,sans-serif}
+</style></head>
+<body>
+<svg id="stage" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="ctl"><button id="play">▶ Play</button></div>
+<audio id="aud" src="narration.mp3" preload="auto"></audio>
+<script src="words.js"></script>
+<script>
+const W = WORDS.words, S = document.getElementById('stage');
+if (location.hash === '#rec') document.body.classList.add('rec');
+// Neutral palette (navy + teal, matching the talk slide). Tier colours: public, internal, sensitive.
+const C = {bg:'#0f1a2e', ink:'#eef2fa', dim:'#9aa8c0', or:'#2fb8b4', bl:'#7fa8e6', gr:'#3fb27f', red:'#e46a6a', warn:'#e0a940',
+           box:'#18263f', line:'#33456a', navy:'#1c2b4a', paper:'#ffffff', soft:'#f5f7fb', ptext:'#172033', pmuted:'#536071', pborder:'#d9dee8', ok:'#1f7a4d', bad:'#a23333'};
+const TIER = [C.gr, C.warn, C.red];
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g,'');
+function at(phrase, after=0){
+  const p = phrase.split(/\s+/).map(norm);
+  for (let i=0;i<W.length;i++){
+    if (W[i].start < after) continue;
+    let ok = true;
+    for (let j=0;j<p.length;j++){ if (!W[i+j] || norm(W[i+j].text)!==p[j]) {ok=false;break;} }
+    if (ok) return W[i].start;
+  }
+  console.error('phrase not found: '+phrase); return 1e9;
+}
+const END = W[W.length-1].end + 1.5;
+const T = {
+  intro: 0,
+  why: at('Start with why agents'),
+  tiers: at('A simple way to'),
+  know: at('The first step is'),
+  decide: at('The second step is'),
+  safe: at('The third step is'),
+  example: at('Here is how that'),
+  rules: at('Your obligations also depend'),
+  outro: at('So the principle is'),
+};
+const cue = {
+  price: at('A public price list'), sales: at('a monthly sales table'), patient: at('and a patient record'), match: at('This video looks'),
+  connect: at('When you connect'), reads: at('It reads quickly'), ends: at('and what it reads'), coding: at('A coding agent building'), onlysafe: at('is only as safe'),
+  pub: at('At one end'), internal: at('In the middle'), sensitive: at('At the far end'), rises: at('As you move along'), safeg: at('and so should the'),
+  cols: at('Which tables and'), combo: at('Remember that fields'), dob: at('A date of birth'), labels: at('Sensitivity labels help'), flow: at('In Fabric and Power'), travels: at('so the classification travels'),
+  q3: at('which agents can access'), purpose: at('Purpose matters as much'), counts: at('Counts of clinic visits'), list: at('a list of individual'), same: at('even when both'),
+  four: at('There are four common'), asis: at('Some data is suitable'), pubgo: at('Public reference data can'),
+  mask: at('Some data needs masking'), view: at('Give the agent a'), caution: at('One caution here'), ddm: at('Dynamic data masking hides'), infer: at('Someone with query access'), many: at('and an agent can'), pair: at('So pair masking'),
+  synth: at('Some work belongs'), copy: at('The synthetic copy has'), build: at('The agent can build'), promote: at('Then you promote'),
+  off: at('And some data stays'), restricted: at('Restricted permissions mean'),
+  analyst: at('An analyst wants'), dev: at('The agent develops'), test: at('Testing uses a'), prod: at('The production model refreshes'), never: at('and the agent itself'), later: at('Later a data agent'), nopatient: at('with no patient level'),
+  nz: at('In New Zealand for'), know2: at('Know which rules apply'),
+  o1: at('Know what you hold'), o2: at('Decide which agents get'), o3: at('And match agent access'),
+};
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>{x=clamp(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2};
+const fin=(t,t0,d=.5)=>ease((t-t0)/d);
+const win2=(t,a,b)=>fin(t,a)*(1-fin(t,b,.4));   // visible from a until b
+let out='';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function txt(x,y,s,{size=28,fill=C.ink,anchor='start',weight=400,op=1,italic=false,mono=false}={}){ if(op<=0)return; out+=`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}" opacity="${op}"${italic?' font-style="italic"':''}${mono?' font-family="Consolas, monospace"':''}>${esc(s)}</text>`; }
+function rect(x,y,w,h,{fill=C.box,stroke=C.line,sw=2,r=10,op=1,dash=''}={}){ if(op<=0)return; out+=`<rect x="${x}" y="${y}" width="${Math.max(0,w)}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function circ(x,y,r,{fill=C.box,stroke=C.line,sw=2,op=1}={}){ if(op<=0)return; out+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${op}"/>`; }
+function line(x1,y1,x2,y2,{stroke=C.dim,sw=2,op=1,dash=''}={}){ if(op<=0)return; out+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function path(d,{stroke=C.dim,sw=2,op=1,dash='',fill='none'}={}){ if(op<=0)return; out+=`<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"${dash?` stroke-dasharray="${dash}"`:''}/>`; }
+function arrow(x1,y1,x2,y2,o={}){ line(x1,y1,x2,y2,o); const a=Math.atan2(y2-y1,x2-x1),L=12; const op=o.op??1; if(op<=0)return;
+  out+=`<polygon points="${x2},${y2} ${x2-L*Math.cos(a-.4)},${y2-L*Math.sin(a-.4)} ${x2-L*Math.cos(a+.4)},${y2-L*Math.sin(a+.4)}" fill="${o.stroke||C.dim}" opacity="${op}"/>`; }
+function tick(x,y,s,col,op,sw=3){ path(`M${x-s*.5},${y} L${x-s*.12},${y+s*.38} L${x+s*.55},${y-s*.4}`,{stroke:col,sw,op}); }
+function cross(x,y,s,col,op,sw=3){ line(x-s/2,y-s/2,x+s/2,y+s/2,{stroke:col,sw,op}); line(x+s/2,y-s/2,x-s/2,y+s/2,{stroke:col,sw,op}); }
+function title(t,t0,s,sub){ const o=fin(t,t0); txt(64,74,s,{size:36,weight:700,op:o}); line(64,92,64+s.length*17,92,{stroke:C.or,sw:4,op:o}); if(sub) txt(64,124,sub,{size:20,fill:C.dim,op:o}); }
+function pill(x,y,w,label,col,op,size=20,h=44){ rect(x,y,w,h,{fill:col+'22',stroke:col,op,r:h/2}); txt(x+w/2,y+h/2+size*.36,label,{size,anchor:'middle',op}); }
+function wrap(s,n){ const ls=[]; let l=''; for(const w of s.split(' ')){ if((l+' '+w).length>n&&l){ls.push(l);l=w;} else l=l?l+' '+w:w; } ls.push(l); return ls; }
+
+// --- icons (centred at x,y; s = nominal size) ---
+function icon(kind,x,y,s,col,op){ if(op<=0) return; const k=s/60;
+  if(kind==='doc'){ path(`M${x-20*k},${y-27*k} L${x+10*k},${y-27*k} L${x+21*k},${y-16*k} L${x+21*k},${y+27*k} L${x-20*k},${y+27*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); [-10,0,10].forEach(d=>line(x-11*k,y+d*k,x+12*k,y+d*k,{stroke:col,op,sw:2.5})); }
+  if(kind==='globe'){ circ(x,y,25*k,{fill:col+'22',stroke:col,sw:3,op}); out+=`<ellipse cx="${x}" cy="${y}" rx="${11*k}" ry="${25*k}" fill="none" stroke="${col}" stroke-width="2.5" opacity="${op}"/>`; line(x-25*k,y,x+25*k,y,{stroke:col,sw:2.5,op}); line(x-21*k,y-12*k,x+21*k,y-12*k,{stroke:col,sw:2,op}); line(x-21*k,y+12*k,x+21*k,y+12*k,{stroke:col,sw:2,op}); }
+  if(kind==='folder'){ path(`M${x-27*k},${y-18*k} L${x-8*k},${y-18*k} L${x-3*k},${y-11*k} L${x+27*k},${y-11*k} L${x+27*k},${y+22*k} L${x-27*k},${y+22*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); [3,13].forEach(d=>line(x-15*k,y+d*k,x+15*k,y+d*k,{stroke:col,sw:2.5,op})); }
+  if(kind==='patient'){ rect(x-22*k,y-27*k,44*k,54*k,{fill:col+'22',stroke:col,sw:3,op,r:5}); circ(x,y-11*k,7*k,{fill:'none',stroke:col,sw:2.5,op}); path(`M${x-12*k},${y+6*k} Q${x},${y-6*k} ${x+12*k},${y+6*k}`,{stroke:col,sw:2.5,op}); line(x-12*k,y+15*k,x+12*k,y+15*k,{stroke:col,sw:2.5,op}); lock(x+20*k,y+20*k,s*.45,col,op); }
+  if(kind==='db'){ const rx=22*k, ry=8*k; out+=`<path d="M${x-rx},${y-18*k} L${x-rx},${y+18*k} A${rx},${ry} 0 0 0 ${x+rx},${y+18*k} L${x+rx},${y-18*k}" fill="${col}22" stroke="${col}" stroke-width="3" opacity="${op}"/>`;
+    out+=`<ellipse cx="${x}" cy="${y-18*k}" rx="${rx}" ry="${ry}" fill="${C.bg}" stroke="${col}" stroke-width="3" opacity="${op}"/>`; path(`M${x-rx},${y} A${rx},${ry} 0 0 0 ${x+rx},${y}`,{stroke:col,sw:2.5,op}); }
+  if(kind==='agent'){ line(x,y-30*k,x,y-21*k,{stroke:col,sw:3,op}); circ(x,y-32*k,4*k,{fill:col,stroke:'none',sw:0,op}); rect(x-24*k,y-21*k,48*k,40*k,{fill:col+'22',stroke:col,sw:3,op,r:10*k});
+    circ(x-9*k,y-3*k,4.5*k,{fill:col,stroke:'none',sw:0,op}); circ(x+9*k,y-3*k,4.5*k,{fill:col,stroke:'none',sw:0,op}); line(x-8*k,y+9*k,x+8*k,y+9*k,{stroke:col,sw:3,op}); line(x-24*k,y-1*k,x-30*k,y-1*k,{stroke:col,sw:3,op}); line(x+24*k,y-1*k,x+30*k,y-1*k,{stroke:col,sw:3,op}); }
+  if(kind==='chat'){ path(`M${x-26*k},${y-20*k} L${x+26*k},${y-20*k} L${x+26*k},${y+12*k} L${x-4*k},${y+12*k} L${x-14*k},${y+24*k} L${x-14*k},${y+12*k} L${x-26*k},${y+12*k} Z`,{stroke:col,sw:3,op,fill:col+'22'}); [-9,1].forEach(d=>line(x-16*k,y+d*k,x+16*k,y+d*k,{stroke:col,sw:2.5,op})); }
+  if(kind==='log'){ rect(x-24*k,y-24*k,48*k,48*k,{fill:col+'22',stroke:col,sw:3,op,r:5}); [-12,-3,6,15].forEach((d,i)=>{ circ(x-14*k,y+d*k,2*k,{fill:col,stroke:'none',sw:0,op}); line(x-8*k,y+d*k,x+(14-i%2*7)*k,y+d*k,{stroke:col,sw:2.5,op}); }); }
+  if(kind==='prompt'){ rect(x-27*k,y-20*k,54*k,40*k,{fill:col+'22',stroke:col,sw:3,op,r:6}); path(`M${x-16*k},${y-7*k} L${x-7*k},${y} L${x-16*k},${y+7*k}`,{stroke:col,sw:3,op}); line(x-2*k,y+8*k,x+14*k,y+8*k,{stroke:col,sw:3,op}); }
+  if(kind==='key'){ circ(x-12*k,y,10*k,{fill:col+'22',stroke:col,sw:3,op}); line(x-2*k,y,x+24*k,y,{stroke:col,sw:3,op}); line(x+16*k,y,x+16*k,y+9*k,{stroke:col,sw:3,op}); line(x+23*k,y,x+23*k,y+7*k,{stroke:col,sw:3,op}); }
+  if(kind==='people'){ [-14,14].forEach(d=>{ circ(x+d*k,y-10*k,8*k,{fill:col+'33',stroke:col,sw:2.5,op}); path(`M${x+(d-15)*k},${y+20*k} Q${x+d*k},${y-6*k} ${x+(d+15)*k},${y+20*k} Z`,{stroke:col,fill:col+'33',op,sw:2.5}); }); }
+  if(kind==='chart'){ line(x-24*k,y+22*k,x+24*k,y+22*k,{stroke:col,sw:3,op}); [[-16,14],[-4,26],[8,38],[20,20]].forEach(([dx,h])=>rect(x+dx*k-4*k,y+22*k-h*k,8*k,h*k,{fill:col,stroke:'none',sw:0,op,r:1})); }
+}
+function lock(x,y,s,col,op,open=0){ if(op<=0) return; const k=s/60; rect(x-16*k,y-6*k,32*k,26*k,{fill:col,stroke:'none',sw:0,op,r:4*k});
+  path(`M${x-10*k},${y-6*k} L${x-10*k},${y-(14+open*8)*k} A${10*k},${10*k} 0 0 1 ${x+10*k},${y-(14+open*8)*k} L${x+10*k},${y-(10+open*8)*k}`,{stroke:col,sw:Math.max(2,4*k),op}); circ(x,y+5*k,3.5*k,{fill:C.bg,stroke:'none',sw:0,op}); }
+function ban(x,y,r,col,op){ circ(x,y,r,{fill:'none',stroke:col,sw:Math.max(3,r/6),op}); line(x-r*.7,y-r*.7,x+r*.7,y+r*.7,{stroke:col,sw:Math.max(3,r/6),op}); }
+const TIERS=[['Public information','globe','published reports, reference data'],['Internal business data','folder','sales, finance, operations'],['Sensitive personal data','patient','e.g. identifiable health data']];
+// sensitivity arrow (gradient)
+function sensArrow(x1,x2,y,op,label=true){ if(op<=0)return;
+  out+=`<defs><linearGradient id="sg" x1="0" x2="1"><stop offset="0" stop-color="${C.gr}" stop-opacity=".15"/><stop offset=".5" stop-color="${C.warn}" stop-opacity=".7"/><stop offset="1" stop-color="${C.red}"/></linearGradient></defs>`;
+  out+=`<rect x="${x1}" y="${y-7}" width="${x2-x1-20}" height="14" rx="7" fill="url(#sg)" opacity="${op}"/>`;
+  out+=`<polygon points="${x2},${y} ${x2-28},${y-18} ${x2-28},${y+18}" fill="${C.red}" opacity="${op}"/>`;
+  if(label) txt((x1+x2)/2,y+40,'Increasing sensitivity',{size:20,anchor:'middle',fill:C.dim,weight:700,op}); }
+
+const scenes = [
+ ['intro', t=>{
+   const o=fin(t,.1,.8);
+   txt(640,170,'AI AGENTS · DATA · GOVERNANCE',{size:20,anchor:'middle',fill:C.or,weight:700,op:o});
+   txt(640,240,'Data risk tiers',{size:58,anchor:'middle',weight:700,op:fin(t,.4,.8)});
+   txt(640,290,'matching AI agent access to the risk of the data',{size:26,anchor:'middle',fill:C.dim,op:fin(t,.9,.8)});
+   const cs=[cue.price,cue.sales,cue.patient], lbl=['Public price list','Monthly sales table','Patient record'], ic=['doc','chart','patient'];
+   cs.forEach((c,i)=>{ const oo=fin(t,c); const x=340+i*300; circ(x,410,56,{fill:C.box,stroke:TIER[i],op:oo,sw:3}); icon(ic[i],x,412,62,TIER[i],oo); txt(x,500,lbl[i],{size:22,anchor:'middle',weight:600,op:oo}); });
+   sensArrow(240,1050,555,fin(t,cue.match),false);
+   txt(640,600,'Different data, different handling',{size:22,anchor:'middle',fill:C.dim,op:fin(t,cue.match)});
+ }],
+ ['why', t=>{
+   title(t,T.why,'Why agents change the picture');
+   const oc=fin(t,cue.connect);
+   // source -> agent
+   rect(70,230,220,190,{fill:C.box,stroke:C.line,op:oc,r:14}); icon('db',180,300,80,C.bl,oc); txt(180,380,'Data source',{size:20,anchor:'middle',weight:700,op:oc});
+   const ag=fin(t,cue.connect+1.2);
+   line(300,325,470,325,{stroke:C.or,sw:4,op:ag}); txt(385,312,'connection',{size:16,anchor:'middle',fill:C.dim,op:ag});
+   circ(560,325,82,{fill:C.or+'1c',stroke:C.or,op:ag,sw:3}); icon('agent',560,333,92,C.or,ag); txt(560,445,'AI agent',{size:22,anchor:'middle',weight:700,op:ag});
+   txt(385,370,'reads whatever',{size:16,anchor:'middle',fill:C.dim,op:fin(t,cue.connect+2.4)}); txt(385,392,'it allows',{size:16,anchor:'middle',fill:C.dim,op:fin(t,cue.connect+2.4)});
+   // query pulses
+   const orr=fin(t,cue.reads);
+   if(orr>0) for(let i=0;i<5;i++){ const ph=((t-cue.reads)*1.4+i/5)%1; circ(300+ph*170,325,5,{fill:C.or,stroke:'none',sw:0,op:orr*(1-fin(t,cue.coding))}); }
+   txt(560,480,'fast · many queries in a row',{size:17,anchor:'middle',fill:C.or,op:orr});
+   // where it ends up
+   const dests=[['prompt','A prompt'],['log','A log'],['chat','A chat history'],['doc','A generated file']];
+   dests.forEach(([ic,s],i)=>{ const oo=fin(t,cue.ends+.5+i*.55); const y=150+i*84; arrow(648,325,820,y+32,{stroke:C.line,op:oo,sw:2.5});
+     rect(830,y,300,64,{fill:C.box,stroke:C.line,op:oo,r:12}); icon(ic,875,y+32,42,C.bl,oo); txt(915,y+40,s,{size:21,op:oo}); });
+   const ok=fin(t,cue.coding);
+   rect(70,520,1060,64,{fill:C.or+'16',stroke:C.or,op:ok,r:12});
+   txt(100,560,'Coding agent → notebook',{size:20,weight:700,op:ok}); txt(420,560,'·',{size:20,op:ok}); txt(445,560,'Data agent → semantic model',{size:20,weight:700,op:ok});
+   txt(1105,560,'only as safe as the data it can reach',{size:19,anchor:'end',fill:C.or,weight:700,op:fin(t,cue.onlysafe)});
+ }],
+ ['tiers', t=>{
+   title(t,T.tiers,'Three tiers of data');
+   const cs=[cue.pub,cue.internal,cue.sensitive];
+   TIERS.forEach(([a,ic,b],i)=>{ const oo=fin(t,cs[i]); const x=240+i*400; const lit=t>=cs[i]&&(i==2||t<cs[i+1]);
+     rect(x-170,160,340,250,{fill:lit?TIER[i]+'1a':C.box,stroke:TIER[i],op:oo,r:16,sw:lit?3:2});
+     icon(ic,x,245,100,TIER[i],oo); txt(x,345,a,{size:24,anchor:'middle',weight:700,op:oo}); txt(x,378,b,{size:18,anchor:'middle',fill:C.dim,op:oo}); });
+   sensArrow(90,1200,450,fin(t,cue.rises));
+   const os=fin(t,cue.safeg);
+   txt(90,545,'Safeguards should rise too',{size:20,weight:700,fill:C.or,op:os});
+   [0,1,2].forEach(i=>{ const h=30+i*30; rect(240+i*400-70,600-h,140,h,{fill:TIER[i]+'88',stroke:TIER[i],op:os*fin(t,cue.safeg+.2+i*.25,.3),r:6}); });
+ }],
+ ['know', t=>{
+   title(t,T.know,'Step 1: understand what you hold');
+   // table
+   const o=fin(t,cue.cols);
+   rect(64,150,600,300,{fill:C.paper,stroke:C.pborder,op:o,r:10,sw:1}); rect(64,150,600,46,{fill:C.navy,stroke:'none',sw:0,op:o,r:10}); rect(64,180,600,16,{fill:C.navy,stroke:'none',sw:0,op:o,r:0});
+   icon('db',92,173,30,C.or,o); txt(116,180,'clinic_visits',{size:19,weight:700,op:o,mono:true});
+   const cols=[['visit_id',0],['full_name',1],['email',1],['date_of_birth',1],['postcode',2],['gender',2],['patient_id',1],['diagnosis',1]];
+   cols.forEach(([c,s],i)=>{ const cx=88+(i%2)*290, cy=212+Math.floor(i/2)*58; const flag=s===1?fin(t,cue.cols+1+i*.35):0; const q=s===2?fin(t,cue.dob):0;
+     const isDob=c==='date_of_birth'; const combo=fin(t,cue.dob)*(isDob||s===2?1:0);
+     const col=combo>0?C.warn:flag>0?C.red:C.pborder;
+     rect(cx,cy,268,44,{fill:combo>0?'#fdf3e1':flag>0?'#fdecec':C.soft,stroke:col,op:o,r:6,sw:flag||combo?2:1});
+     txt(cx+16,cy+29,c,{size:18,fill:C.ptext,op:o,mono:true});
+     if(flag>0&&!combo) txt(cx+252,cy+29,'personal',{size:14,anchor:'end',fill:C.bad,weight:700,op:flag});
+   });
+   // combination
+   const oc=fin(t,cue.combo);
+   txt(720,180,'IDENTIFYING IN COMBINATION',{size:17,fill:C.warn,weight:700,op:oc});
+   const parts=['Date of birth','Postcode','Gender']; parts.forEach((p,i)=>{ const oo=fin(t,cue.dob+.3+i*.5); pill(720+i*170,200,155,p,C.warn,oo,17,40); if(i<2) txt(720+i*170+162,227,'+',{size:22,anchor:'middle',fill:C.warn,weight:700,op:oo}); });
+   const op1=fin(t,cue.dob+2.2); arrow(970,250,970,292,{stroke:C.warn,op:op1,sw:3}); icon('people',940,320,0,C.warn,0);
+   rect(860,298,220,50,{fill:C.warn+'22',stroke:C.warn,op:op1,r:25}); txt(970,330,'often one person',{size:19,anchor:'middle',weight:700,op:op1});
+   // label flow
+   const ol=fin(t,cue.labels); txt(64,500,'SENSITIVITY LABELS',{size:17,fill:C.or,weight:700,op:ol});
+   const items=[['db','Source table'],['chart','Semantic model'],['doc','Report']];
+   items.forEach(([ic,s],i)=>{ const x=64+i*400; const oo=fin(t,cue.flow+i*1.0); rect(x,515,330,78,{fill:C.box,stroke:C.line,op:i?oo:ol,r:12});
+     icon(ic,x+42,554,44,C.bl,i?oo:ol); txt(x+80,548,s,{size:20,weight:700,op:i?oo:ol});
+     const lo=i?fin(t,cue.flow+i*1.0+.4):fin(t,cue.labels+.5); rect(x+80,560,186,24,{fill:C.red+'33',stroke:C.red,op:lo,r:12,sw:1.5}); txt(x+173,577,'Highly confidential',{size:14,anchor:'middle',weight:700,op:lo});
+     if(i<2) arrow(x+335,554,x+395,554,{stroke:C.or,op:fin(t,cue.flow+i*1.0+.3),sw:3}); });
+   txt(1216,500,'the label travels with the data',{size:17,anchor:'end',fill:C.dim,op:fin(t,cue.travels)});
+ }],
+ ['decide', t=>{
+   title(t,T.decide,'Step 2: decide access, purpose and safeguards');
+   const qs=[['agent','Which agents?'],['chart','For what purpose?'],['key','With what safeguards?']];
+   const ps=fin(t,cue.purpose);
+   qs.forEach(([ic,s],i)=>{ const oo=fin(t,T.decide+1.5+i*.9); const x=70+i*390; const hl=i==1?ps:0;
+     rect(x,150,360,90,{fill:hl?C.or+'22':C.box,stroke:hl?C.or:C.line,op:oo,r:14,sw:hl?3:2}); icon(ic,x+52,195,52,C.or,oo); txt(x+96,204,s,{size:22,weight:700,op:oo}); });
+   txt(70,290,'Purpose matters as much as the data',{size:24,weight:700,fill:C.or,op:ps});
+   // same table, two uses
+   const oc=fin(t,cue.counts);
+   rect(70,315,540,260,{fill:C.gr+'12',stroke:C.gr,op:oc,r:14}); txt(95,350,'Clinic visits by region',{size:21,weight:700,op:oc}); txt(585,350,'lower risk',{size:17,anchor:'end',fill:C.gr,weight:700,op:oc});
+   [['North',120],['Central',190],['South',150],['East',90],['West',165]].forEach(([r,v],i)=>{ const oo=fin(t,cue.counts+.4+i*.15); const y=372+i*38; txt(95,y+22,r,{size:16,fill:C.dim,op:oo}); rect(185,y+6,v*1.8,22,{fill:C.gr,stroke:'none',sw:0,op:oo,r:4}); txt(195+v*1.8,y+23,String(v*7),{size:15,fill:C.dim,op:oo}); });
+   const ol=fin(t,cue.list);
+   rect(670,315,540,260,{fill:C.red+'12',stroke:C.red,op:ol,r:14}); txt(695,350,'List of individual patients',{size:21,weight:700,op:ol}); txt(1185,350,'higher risk',{size:17,anchor:'end',fill:C.red,weight:700,op:ol});
+   [['J. Citizen','14/03/1986','Asthma'],['A. Sample','02/11/1972','Diabetes'],['K. Example','27/07/1990','Fracture'],['M. Person','19/01/1958','Cardiac'],['R. Name','08/05/2001','Migraine']].forEach((r,i)=>{ const oo=fin(t,cue.list+.4+i*.15); const y=372+i*38;
+     rect(695,y,490,32,{fill:C.box,stroke:C.line,op:oo,r:5,sw:1}); txt(710,y+22,r[0],{size:16,op:oo}); txt(860,y+22,r[1],{size:16,op:oo,mono:true}); txt(1020,y+22,r[2],{size:16,op:oo}); });
+   txt(1185,598,'illustrative, fictional rows',{size:13,anchor:'end',italic:true,fill:C.dim,op:ol});
+   const os=fin(t,cue.same); txt(1210,290,'both from the same source table',{size:20,anchor:'end',weight:700,fill:C.dim,op:os});
+ }],
+ ['safe', t=>{
+   title(t,T.safe,'Step 3: choose the safeguard');
+   const opts=[['As it is',C.gr,cue.asis],['Masked or minimised',C.warn,cue.mask],['Synthetic dev data',C.bl,cue.synth],['Off limits',C.red,cue.off]];
+   const four=fin(t,cue.four);
+   // left rail of four options
+   opts.forEach(([s,col,c],i)=>{ const oo=fin(t,cue.four+.4+i*.35); const y=150+i*112; const act=t>=c&&(i==3||t<opts[i+1][2]);
+     rect(60,y,320,96,{fill:act?col+'26':C.box,stroke:act?col:C.line,op:oo,r:14,sw:act?3:2});
+     circ(108,y+48,26,{fill:col+'33',stroke:col,op:oo}); txt(108,y+57,String(i+1),{size:24,anchor:'middle',weight:700,op:oo});
+     txt(150,y+57,s,{size:22,weight:700,op:oo*(act||t<cue.asis?1:.65)}); });
+   const X=420, Y=150, PW=800, PH=430;
+   // overview panel before the first option
+   const ov=fin(t,cue.four)*(1-fin(t,cue.asis,.4));
+   rect(X,Y,PW,PH,{fill:C.box,stroke:C.line,op:ov,r:16}); txt(X+PW/2,Y+200,'Four common options,',{size:30,anchor:'middle',weight:700,op:ov}); txt(X+PW/2,Y+245,'from least to most restrictive',{size:24,anchor:'middle',fill:C.dim,op:ov});
+   // 1. as is
+   const o1=win2(t,cue.asis,cue.mask);
+   rect(X,Y,PW,PH,{fill:C.gr+'10',stroke:C.gr,op:o1,r:16});
+   icon('globe',X+190,Y+190,110,C.gr,fin(t,cue.pubgo)*o1); txt(X+190,Y+290,'Public reference data',{size:21,anchor:'middle',weight:700,op:fin(t,cue.pubgo)*o1});
+   arrow(X+300,Y+190,X+480,Y+190,{stroke:C.gr,sw:4,op:fin(t,cue.pubgo+.6)*o1});
+   icon('agent',X+590,Y+195,110,C.or,fin(t,cue.pubgo+.6)*o1); txt(X+590,Y+290,'Agent',{size:21,anchor:'middle',weight:700,op:fin(t,cue.pubgo+.6)*o1});
+   txt(X+PW/2,Y+380,'Suitable as it is',{size:24,anchor:'middle',fill:C.gr,weight:700,op:o1});
+   // 2. masked / minimised
+   const o2=win2(t,cue.mask,cue.synth);
+   const pA=o2*(1-fin(t,cue.caution,.5)), pB=o2*fin(t,cue.caution,.5);
+   rect(X,Y,PW,PH,{fill:C.warn+'10',stroke:C.warn,op:o2,r:16});
+   txt(X+30,Y+45,'Raw row',{size:17,fill:C.dim,weight:700,op:pA*fin(t,cue.view)});
+   const raw=['Jane Citizen','jane.c@example.com','14/03/1986','Auckland'], hdr=['Name','Email','Date of birth','City'];
+   const vw=['removed','j•••@•••••.com','1980–1989','Auckland'];
+   raw.forEach((s,i)=>{ const oo=pA*fin(t,cue.view); const x=X+30+i*190; txt(x,Y+80,hdr[i],{size:14,fill:C.dim,op:oo}); rect(x,Y+90,178,40,{fill:C.soft,stroke:C.pborder,op:oo,r:5,sw:1}); txt(x+10,Y+116,s,{size:15,fill:C.ptext,op:oo}); });
+   arrow(X+PW/2,Y+145,X+PW/2,Y+190,{stroke:C.warn,sw:3,op:pA*fin(t,cue.view+1.2)});
+   txt(X+30,Y+215,"Agent's view",{size:17,fill:C.warn,weight:700,op:pA*fin(t,cue.view+1.2)});
+   vw.forEach((s,i)=>{ const oo=pA*fin(t,cue.view+1.4+i*.4); const x=X+30+i*190; const rem=i==0;
+     rect(x,Y+225,178,40,{fill:rem?C.box:'#fdf3e1',stroke:C.warn,op:oo,r:5,sw:1.5,dash:rem?'5 4':''}); txt(x+10,Y+251,s,{size:15,fill:rem?C.dim:C.ptext,op:oo,italic:rem,mono:i==1}); });
+   ['removed','masked','aggregated'].forEach((s,i)=>pill(X+30+i*240,Y+300,220,s,C.warn,pA*fin(t,cue.view+2.6+i*.4),18,40));
+   txt(X+PW/2,Y+390,'Only what the task needs',{size:24,anchor:'middle',fill:C.warn,weight:700,op:pA*fin(t,cue.view+3.5)});
+   // caution: inference by repeated queries
+   txt(X+30,Y+48,'ONE CAUTION',{size:17,fill:C.red,weight:700,op:pB});
+   txt(X+30,Y+82,'Dynamic data masking hides values on display. It is not a complete defence.',{size:19,op:pB*fin(t,cue.ddm)});
+   rect(X+30,Y+105,250,40,{fill:'#fdf3e1',stroke:C.warn,op:pB*fin(t,cue.ddm+1),r:5,sw:1.5}); txt(X+42,Y+131,'salary:  xxxx',{size:16,fill:C.ptext,op:pB*fin(t,cue.ddm+1),mono:true});
+   const qs=['WHERE salary > 50000  → 1 row','WHERE salary > 75000  → 0 rows','WHERE salary > 62500  → 1 row','WHERE salary > 68750  → 0 rows','WHERE salary > 65625  → 1 row'];
+   icon('agent',X+90,Y+250,70,C.or,pB*fin(t,cue.infer));
+   qs.forEach((s,i)=>{ const oo=pB*fin(t,cue.infer+1+i*(i<2?.9:.35)); txt(X+170,Y+190+i*30,s,{size:16,fill:C.dim,op:oo,mono:true}); });
+   const oinf=pB*fin(t,cue.many+1); rect(X+520,Y+215,250,50,{fill:C.red+'22',stroke:C.red,op:oinf,r:25}); txt(X+645,Y+246,'real value narrowed down',{size:17,anchor:'middle',weight:700,op:oinf});
+   txt(X+30,Y+365,'Pair it with',{size:18,fill:C.dim,op:pB*fin(t,cue.pair)});
+   ['Row-level security','Column-level security','Least privilege'].forEach((s,i)=>pill(X+150+i*210,Y+340,200,s,C.or,pB*fin(t,cue.pair+.8+i*.5),16,40));
+   txt(X+PW-20,Y+PH-14,'illustrative queries',{size:13,anchor:'end',italic:true,fill:C.dim,op:pB});
+   // 3. synthetic dev environment
+   const o3=win2(t,cue.synth,cue.off);
+   rect(X,Y,PW,PH,{fill:C.bl+'10',stroke:C.bl,op:o3,r:16});
+   rect(X+30,Y+30,330,270,{fill:C.box,stroke:C.bl,op:o3,r:14}); txt(X+50,Y+65,'Development',{size:21,weight:700,op:o3});
+   const oc=o3*fin(t,cue.copy); icon('db',X+100,Y+150,70,C.bl,oc); txt(X+100,Y+220,'Synthetic copy',{size:16,anchor:'middle',weight:700,op:oc}); txt(X+100,Y+242,'same schema',{size:14,anchor:'middle',fill:C.dim,op:oc}); txt(X+100,Y+262,'no real people',{size:14,anchor:'middle',fill:C.dim,op:oc});
+   const ob=o3*fin(t,cue.build); icon('agent',X+270,Y+140,64,C.or,ob); arrow(X+232,Y+150,X+145,Y+150,{stroke:C.or,op:ob,sw:2.5});
+   ['notebook','pipeline','semantic model'].forEach((s,i)=>pill(X+205,Y+190+i*34,140,s,C.or,ob*fin(t,cue.build+.6+i*.4),13,28));
+   rect(X+440,Y+30,330,270,{fill:C.box,stroke:C.line,op:o3,r:14}); txt(X+460,Y+65,'Production',{size:21,weight:700,op:o3});
+   icon('db',X+530,Y+150,70,C.red,o3); lock(X+560,Y+180,34,C.red,o3); txt(X+530,Y+235,'Real data',{size:16,anchor:'middle',weight:700,op:o3});
+   const op3=o3*fin(t,cue.promote); arrow(X+365,Y+120,X+435,Y+120,{stroke:C.gr,op:op3,sw:4}); txt(X+400,Y+105,'code',{size:15,anchor:'middle',fill:C.gr,weight:700,op:op3});
+   line(X+365,Y+215,X+435,Y+215,{stroke:C.dim,op:op3,sw:3,dash:'6 6'}); cross(X+400,Y+215,16,C.red,op3); txt(X+400,Y+250,'data',{size:15,anchor:'middle',fill:C.red,weight:700,op:op3});
+   const oid=o3*fin(t,cue.promote+2.5); icon('key',X+665,Y+140,50,C.gr,oid); txt(X+680,Y+190,'governed',{size:15,anchor:'middle',fill:C.gr,op:oid}); txt(X+680,Y+210,'identity',{size:15,anchor:'middle',fill:C.gr,op:oid});
+   txt(X+PW/2,Y+370,'Promote the code, not the data',{size:24,anchor:'middle',fill:C.bl,weight:700,op:op3});
+   // 4. off limits
+   const o4=fin(t,cue.off);
+   rect(X,Y,PW,PH,{fill:C.red+'10',stroke:C.red,op:o4,r:16});
+   icon('agent',X+150,Y+190,110,C.or,o4); txt(X+150,Y+290,"Agent's identity",{size:20,anchor:'middle',weight:700,op:o4});
+   const orr=fin(t,cue.restricted); line(X+250,Y+190,X+340,Y+190,{stroke:C.red,sw:3,op:orr,dash:'8 7'}); ban(X+400,Y+190,40,C.red,orr); arrow(X+460,Y+190,X+540,Y+190,{stroke:C.red,sw:3,op:orr,dash:'8 7'});
+   icon('db',X+640,Y+190,110,C.red,o4); lock(X+690,Y+235,52,C.red,o4); txt(X+640,Y+290,'Restricted source',{size:20,anchor:'middle',weight:700,op:o4});
+   txt(X+PW/2,Y+380,'Cannot reach it at all',{size:24,anchor:'middle',fill:C.red,weight:700,op:orr});
+ }],
+ ['example', t=>{
+   title(t,T.example,'In practice: a readmissions report');
+   const oa=fin(t,cue.analyst); txt(64,124,'An analyst uses a coding agent to build it',{size:20,fill:C.dim,op:oa});
+   const st=[['Development','Synthetic copy',C.bl,cue.dev],['Testing','Masked view',C.warn,cue.test],['Production','Real patient data',C.red,cue.prod]];
+   st.forEach(([a,b,col,c],i)=>{ const oo=fin(t,c); const x=64+i*400;
+     rect(x,160,360,250,{fill:C.box,stroke:col,op:oo,r:16,sw:2.5}); txt(x+24,198,a,{size:22,weight:700,op:oo});
+     icon('db',x+90,290,80,col,oo); if(i==2) lock(x+125,325,40,col,oo); txt(x+90,375,b,{size:17,anchor:'middle',weight:700,op:oo});
+     if(i<2) arrow(x+365,285,x+395,285,{stroke:C.dim,op:fin(t,st[i+1][3]),sw:3}); });
+   // coding agent moves dev -> test; blocked from prod
+   const agx = 64+260 + 400*fin(t,cue.test,1.2); const oag=fin(t,cue.dev+.8);
+   icon('agent',agx,280,70,C.or,oag); txt(agx,350,'coding agent',{size:15,anchor:'middle',fill:C.or,op:oag});
+   const oid=fin(t,cue.prod+1.5); icon('key',864+260,260,52,C.gr,oid); txt(864+260,300,'service',{size:15,anchor:'middle',fill:C.gr,op:oid}); txt(864+260,318,'identity',{size:15,anchor:'middle',fill:C.gr,op:oid});
+   const ref=fin(t,cue.prod+2.8); txt(1124,340,'refreshes the',{size:14,anchor:'middle',fill:C.gr,op:ref}); txt(1124,358,'model',{size:14,anchor:'middle',fill:C.gr,op:ref});
+   const on=fin(t,cue.never); line(agx+40,280,860,280,{stroke:C.red,sw:3,op:on*(t>cue.test+1.2?1:0),dash:'7 6'}); ban(845,280,20,C.red,on);
+   txt(64+400*2+180,440,'agent never touches identifiable records',{size:16,anchor:'middle',fill:C.red,weight:700,op:on});
+   // later: data agent over aggregated view
+   const ol=fin(t,cue.later);
+   rect(64,470,1160,110,{fill:C.gr+'10',stroke:C.gr,op:ol,r:16});
+   icon('chart',150,525,60,C.gr,ol); txt(195,522,'Aggregated view',{size:20,weight:700,op:ol}); txt(195,548,'no patient-level rows',{size:16,fill:C.dim,op:fin(t,cue.nopatient)});
+   arrow(420,525,520,525,{stroke:C.gr,op:ol,sw:3}); icon('agent',580,528,64,C.or,ol); txt(625,522,'Data agent',{size:20,weight:700,op:ol}); txt(625,548,'answers questions',{size:16,fill:C.dim,op:ol});
+   arrow(820,525,920,525,{stroke:C.gr,op:ol,sw:3}); icon('people',980,530,64,C.bl,ol); txt(1025,532,'Managers',{size:20,weight:700,op:ol});
+ }],
+ ['rules', t=>{
+   title(t,T.rules,'Obligations follow the tier');
+   const o=fin(t,T.rules+.3);
+   TIERS.forEach(([a,ic],i)=>{ const x=100+i*360; const hl=i==2?fin(t,cue.nz):0; const oo=o*(i==2?1:1-.55*fin(t,cue.nz));
+     rect(x,170,320,150,{fill:hl?C.red+'1a':C.box,stroke:TIER[i],op:oo,r:14,sw:hl?3:2}); icon(ic,x+60,245,70,TIER[i],oo); txt(x+110,252,a.split(' ')[0],{size:22,weight:700,op:oo}); txt(x+110,280,a.split(' ').slice(1).join(' '),{size:18,fill:C.dim,op:oo}); });
+   const on=fin(t,cue.nz+1);
+      txt(100,410,'EXAMPLE: NEW ZEALAND',{size:17,fill:C.or,weight:700,op:on});
+   pill(100,430,420,'Health Information Privacy Code 2020',C.red,on,19,48);
+   txt(545,462,'+',{size:28,weight:700,anchor:'middle',op:fin(t,cue.nz+2.5)});
+   pill(575,430,240,'Privacy Act 2020',C.bl,fin(t,cue.nz+2.5),19,48);
+   const ok=fin(t,cue.know2); rect(100,520,1080,64,{fill:C.or+'1c',stroke:C.or,op:ok,r:12});
+   txt(640,562,'Know which rules apply before you connect anything.',{size:24,anchor:'middle',weight:700,op:ok});
+ }],
+ ['outro', t=>{
+   const o=fin(t,T.outro+.1);
+   txt(640,120,'The principle',{size:24,anchor:'middle',fill:C.or,weight:700,op:o});
+   const items=[['db','Know what you hold',cue.o1],['agent','Decide which agents, for what purpose',cue.o2],['key','Match safeguards to the risk',cue.o3]];
+   items.forEach(([ic,s,c],i)=>{ const oo=fin(t,c); const x=220+i*420; circ(x,240,62,{fill:C.box,stroke:C.or,op:oo,sw:3}); icon(ic,x,246,72,C.or,oo);
+     wrap(s,22).forEach((l,k)=>txt(x,345+k*30,l,{size:22,anchor:'middle',weight:600,op:oo})); if(i<2) arrow(x+75,240,x+345,240,{stroke:C.line,op:fin(t,items[i+1][2]),sw:3}); });
+   const ob=fin(t,cue.o3+1.5); rect(140,470,1000,84,{fill:C.or+'1c',stroke:C.or,op:ob,r:14});
+   txt(640,522,"Match agent access and safeguards to the data's risk.",{size:30,anchor:'middle',weight:700,op:ob});
+ }],
+];
+
+const SENTS=[]; { let cur=null; for(const w of W){ if(!cur){cur={start:w.start,text:[]};} cur.text.push(w.text); cur.end=w.end; if(/[.?!]$/.test(w.text)){SENTS.push(cur);cur=null;} } if(cur)SENTS.push(cur); }
+function subtitle(t){ const s=SENTS.find(s=>t>=s.start-.05 && t<=s.end+.3); if(!s) return;
+  const lines=wrap(s.text.join(' '),98);
+  const h=lines.length*30+18; rect(140,714-h-4,1000,h,{fill:'#000000',stroke:'none',sw:0,r:8,op:.7});
+  lines.forEach((ln,i)=>txt(640,714-h-4+32+i*30,ln,{size:20.5,anchor:'middle'})); }
+
+window.render = function(t){
+  out=`<rect width="1280" height="720" fill="${C.bg}"/>`;
+  const keys=scenes.map(s=>T[s[0]]);
+  let idx=0; for(let i=0;i<scenes.length;i++) if(t>=keys[i]) idx=i;
+  const next = idx+1<scenes.length ? keys[idx+1] : END;
+  const fadeOut = clamp((next - t)/0.4);
+  out+=`<g opacity="${idx+1<scenes.length?fadeOut:1}">`; scenes[idx][1](t); out+='</g>';
+  rect(0,0,1280*clamp(t/END),4,{fill:C.or,stroke:'none',sw:0,r:0});
+  subtitle(t);
+  S.innerHTML=out;
+};
+render(0);
+const aud=document.getElementById('aud');
+document.getElementById('play').onclick=()=>{ aud.paused?aud.play():aud.pause(); };
+(function loop(){ if(!aud.paused) render(aud.currentTime); requestAnimationFrame(loop); })();
+</script>
+</body></html>
